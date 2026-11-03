@@ -1,11 +1,13 @@
 import http from 'node:http';
 import type { Server } from 'node:http';
+import { readFile } from 'node:fs/promises';
+import pathUtil from 'node:path';
 import type { RenderedPageSnapshot } from '../shared/contracts.js';
 import { auditSnapshot } from '../engine/index.js';
 import { captureRenderedPage, type CdpSnapshotOptions } from './cdp.js';
 import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
 
-export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; }
+export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; staticRoot?: string; logoPath?: string; }
 export interface RunningServer { server: Server; url: string; close: () => Promise<void>; }
 
 function json(response: http.ServerResponse, status: number, body: unknown): void { response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); response.end(JSON.stringify(body)); }
@@ -20,6 +22,19 @@ export function createLocalServer(options: ServerOptions = {}): Server {
   return http.createServer(async (request, response) => {
     try {
       const path = new URL(request.url ?? '/', 'http://localhost').pathname;
+      if (request.method === 'GET' && options.staticRoot && path !== '/health' && !path.startsWith('/api/')) {
+        const requested = path === '/' ? 'index.html' : path === '/logo.png' && options.logoPath ? options.logoPath : path.slice(1);
+        const filePath = pathUtil.resolve(pathUtil.isAbsolute(requested) ? requested : pathUtil.join(options.staticRoot, requested));
+        const rootPath = pathUtil.resolve(options.staticRoot);
+        if (path !== '/logo.png' && !filePath.startsWith(`${rootPath}${pathUtil.sep}`)) return json(response, 403, { error: 'Recurso bloqueado.' });
+        try {
+          const content = await readFile(filePath);
+          const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png' };
+          response.writeHead(200, { 'content-type': types[pathUtil.extname(filePath)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
+          response.end(content);
+          return;
+        } catch { return json(response, 404, { error: 'Recurso não encontrado.' }); }
+      }
       if (request.method === 'GET' && path === '/health') return json(response, 200, { ok: true });
       if (request.method !== 'POST' || path !== '/api/analyze') return json(response, 404, { error: 'Rota não encontrada.' });
       const parsed = JSON.parse(await body(request, maxBytes)) as { url?: unknown };

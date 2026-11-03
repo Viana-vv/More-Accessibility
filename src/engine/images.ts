@@ -49,7 +49,7 @@ export function collectImageAnalyses(elements: RenderedElement[]): ImageAnalysis
     const tag = element.tagName.toLowerCase();
     const background = element.computedStyle.backgroundImage;
     const candidates: ImageCandidate[] = [];
-    if (tag === 'img' || tag === 'area') candidates.push({ element, source: attr(element, 'src') || attr(element, 'srcset'), isCssBackground: false, ancestorElements: ancestors(element, elements), nearbyText: nearbyText(element, elements) });
+    if (tag === 'img' || tag === 'svg' || attr(element, 'role') === 'img') candidates.push({ element, source: attr(element, 'src') || attr(element, 'data') || 'inline', isCssBackground: false, ancestorElements: ancestors(element, elements), nearbyText: nearbyText(element, elements) });
     if (background && background !== 'none' && background.includes('url(')) candidates.push({ element, source: background, isCssBackground: true, ancestorElements: ancestors(element, elements), nearbyText: nearbyText(element, elements) });
     return candidates.map((candidate) => {
       const classification = classifyImage(candidate);

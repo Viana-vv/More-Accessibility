@@ -10,6 +10,36 @@ test('calcula luminância e contraste WCAG', () => {
   assert.ok(Math.abs(contrastRatio({ r: 0, g: 0, b: 0 }, { r: 255, g: 255, b: 255 }) - 21) < 0.01);
 });
 
+test('ocorrências possuem identificador estável, localização e dados de remediação', () => {
+  const input = element('field-1', 'input', { attributes: { id: 'email', type: 'email' }, html: '<input id="email" type="email">' });
+  const first = auditSnapshot(snapshot([input])).results.find((item) => item.ruleId === 'wcag-3.3.2-labels');
+  const second = auditSnapshot(snapshot([input])).results.find((item) => item.ruleId === 'wcag-3.3.2-labels');
+  assert.equal(first?.occurrenceId, second?.occurrenceId);
+  assert.equal(first?.selector, 'input#email');
+  assert.equal(first?.html, input.html);
+  assert.equal(first?.impact, 'serious');
+  assert.match(first?.remediation ?? '', /label/i);
+  assert.match(first?.expectedResult ?? '', /rótulo/i);
+});
+
+test('não avalia WCAG quando a captura é inválida', () => {
+  const report = auditSnapshot({ ...snapshot([element('button-1', 'button')]), captureState: 'timeout', captureMessage: 'Tempo excedido' });
+  assert.equal(report.captureState, 'timeout');
+  assert.equal(report.captureMessage, 'Tempo excedido');
+  assert.deepEqual(report.results, []);
+});
+
+test('analisa SVG, role=img e imagens CSS sem duplicar ocorrências do mesmo candidato', () => {
+  const images = collectImageAnalyses([
+    element('svg-1', 'svg', { attributes: { role: 'img' } }),
+    element('role-img', 'div', { attributes: { role: 'img', 'aria-label': 'Logotipo' } }),
+    element('css-image', 'div', { computedStyle: { backgroundImage: 'url(/hero.png)' } }),
+  ]);
+  assert.deepEqual(images.map((image) => image.elementId), ['svg-1', 'role-img', 'css-image']);
+  assert.equal(images[1].purpose, 'indeterminate');
+  assert.equal(images[2].humanReviewRequired, true);
+});
+
 test('classifica imagem decorativa como sugestão contextual, sem afirmar além da evidência', () => {
   const images = collectImageAnalyses([element('img-1', 'img', { attributes: { src: '/shape.svg', alt: '' } })]);
   assert.equal(images[0].purpose, 'decorative');

@@ -22,3 +22,14 @@ test('interface inclui foco visível e layout responsivo', () => {
   assert.match(css, /:focus-visible\{/);
   assert.match(css, /@media \(max-width:760px\)/);
 });
+
+test('interface prevê detalhe por ocorrência, comparação e cópia', async () => {
+  const app = await readFile(resolve(root, 'src/ui/app.js'), 'utf8');
+  const resultsCss = await readFile(resolve(root, 'src/ui/results.css'), 'utf8');
+  assert.match(html, /<details class="criterion-item">/);
+  assert.match(app, /occurrenceId/);
+  assert.match(app, /correctedHtml/);
+  assert.match(app, /navigator\.clipboard\.writeText/);
+  assert.match(app, /captureBlocked/);
+  assert.match(resultsCss, /\.comparison-grid/);
+});

@@ -1,6 +1,7 @@
 export type AuditStatus = 'pass' | 'violation' | 'review' | 'not-applicable';
 export type ConformanceLevel = 'A' | 'AA' | 'AAA';
 export type ImagePurpose = 'decorative' | 'informative-or-functional' | 'indeterminate';
+export type CaptureState = 'captured' | 'authentication-required' | 'blocked' | 'network-error' | 'timeout' | 'content-unavailable';
 
 export interface PageTarget {
   url: string;
@@ -26,13 +27,19 @@ export interface ImageAnalysis {
 }
 
 export interface RuleResult {
+  occurrenceId?: string;
   ruleId: string;
   criterion: string;
   description: string;
   level: ConformanceLevel;
   status: AuditStatus;
   evidence: AccessibilityEvidence[];
+  selector?: string;
+  impact?: string;
+  html?: string;
   remediation?: string;
+  correctedHtml?: string;
+  expectedResult?: string;
 }
 
 export interface RenderedElement {
@@ -53,6 +60,8 @@ export interface RenderedPageSnapshot {
   elements: RenderedElement[];
   images: ImageAnalysis[];
   capturedAt: string;
+  captureState?: CaptureState;
+  captureMessage?: string;
 }
 
 export interface AuditReport {
@@ -60,6 +69,8 @@ export interface AuditReport {
   snapshot: RenderedPageSnapshot;
   results: RuleResult[];
   generatedAt: string;
+  captureState?: CaptureState;
+  captureMessage?: string;
 }
 
 export interface CorrectionSuggestion {

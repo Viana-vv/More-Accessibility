@@ -9,7 +9,9 @@ export { rules } from './rules.js';
 export type { ImageCandidate, ImageClassification, RuleContext, WcagRule } from './types.js';
 
 export function auditSnapshot(snapshot: RenderedPageSnapshot, selectedRules: WcagRule[] = rules): AuditReport {
+  const captureState = snapshot.captureState ?? 'captured';
   const images = snapshot.elements.length ? collectImageAnalyses(snapshot.elements) : snapshot.images;
   const context: RuleContext = { snapshot: { ...snapshot, images }, elements: snapshot.elements, images };
-  return { target: { url: snapshot.url }, snapshot: context.snapshot, results: selectedRules.flatMap((rule) => rule.evaluate(context)), generatedAt: new Date().toISOString() };
+  const results = captureState === 'captured' ? selectedRules.flatMap((rule) => rule.evaluate(context)) : [];
+  return { target: { url: snapshot.url }, snapshot: context.snapshot, results, generatedAt: new Date().toISOString(), captureState, ...(snapshot.captureMessage === undefined ? {} : { captureMessage: snapshot.captureMessage }) };
 }

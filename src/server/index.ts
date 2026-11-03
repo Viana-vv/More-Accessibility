@@ -1,6 +1,7 @@
 import http from 'node:http';
 import type { Server } from 'node:http';
 import type { RenderedPageSnapshot } from '../shared/contracts.js';
+import { auditSnapshot } from '../engine/index.js';
 import { captureRenderedPage, type CdpSnapshotOptions } from './cdp.js';
 import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
 
@@ -25,7 +26,7 @@ export function createLocalServer(options: ServerOptions = {}): Server {
       if (typeof parsed.url !== 'string') return json(response, 400, { error: 'O campo url é obrigatório.' });
       const safe = await validateExternalUrl(parsed.url);
       const snapshot = options.fixture ? typeof options.fixture === 'function' ? await options.fixture() : options.fixture : await captureRenderedPage(safe.url.href, options);
-      return json(response, 200, { snapshot });
+      return json(response, 200, { snapshot, report: auditSnapshot(snapshot) });
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });

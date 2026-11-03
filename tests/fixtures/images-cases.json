@@ -1,0 +1,12 @@
+[
+  {"id":"image-01","expectedPurpose":"decorative","humanReviewRequired":false},
+  {"id":"image-02","expectedPurpose":"decorative","humanReviewRequired":true},
+  {"id":"image-03","expectedPurpose":"informative-or-functional","humanReviewRequired":true},
+  {"id":"image-04","expectedPurpose":"informative-or-functional","humanReviewRequired":true},
+  {"id":"image-05","expectedPurpose":"informative-or-functional","humanReviewRequired":false},
+  {"id":"image-06","expectedPurpose":"informative-or-functional","humanReviewRequired":false},
+  {"id":"image-07","expectedPurpose":"informative-or-functional","humanReviewRequired":false},
+  {"id":"image-08","expectedPurpose":"decorative","humanReviewRequired":false},
+  {"id":"image-09","expectedPurpose":"indeterminate","humanReviewRequired":true},
+  {"id":"image-10","expectedPurpose":"indeterminate","humanReviewRequired":true}
+]

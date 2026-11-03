@@ -18,14 +18,6 @@
         <a class="nav-link" href="#analises" data-view="analyses">Análises</a>
         <a class="nav-link" href="#relatorios" data-view="reports">Relatórios</a>
       </nav>
-      <div class="header-actions" aria-label="Ações da conta">
-        <button class="icon-button" type="button" aria-label="Notificações" title="Notificações">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>
-        </button>
-        <button class="icon-button" type="button" aria-label="Perfil" title="Perfil">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><circle cx="12" cy="9" r="3" /><path d="M6.8 18a6 6 0 0 1 10.4 0" /></svg>
-        </button>
-      </div>
     </header>
 
     <main id="main-content">
@@ -48,27 +40,23 @@
         </form>
         <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
         <div class="feature-grid" aria-label="Recursos da análise">
-          <article class="feature-card">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-3Z" /><path d="m8 12 2.5 2.5L16 9" /></svg>
-            <h2>Conformidade<br />WCAG 2.2</h2>
-          </article>
-          <article class="feature-card">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg>
-            <h2>Sugestões de<br />correção</h2>
-          </article>
-          <article class="feature-card">
-            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" /></svg>
-            <h2>Exemplos de<br />implementação</h2>
-          </article>
+          <article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-3Z" /><path d="m8 12 2.5 2.5L16 9" /></svg><h2>Conformidade<br />WCAG 2.2</h2></article>
+          <article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg><h2>Sugestões de<br />correção</h2></article>
+          <article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" /></svg><h2>Exemplos de<br />implementação</h2></article>
         </div>
       </section>
 
       <section id="analises" class="view panel-view" aria-labelledby="analyses-title" hidden>
-        <div class="section-heading"><p class="eyebrow">Resultados</p><h1 id="analyses-title">Análises</h1><p>Os resultados da URL analisada aparecerão aqui, organizados por critério e evidência.</p></div>
+        <div class="section-heading"><p class="eyebrow">Resultados reais</p><h1 id="analyses-title">Análises</h1><p>Veja os resultados produzidos pelo motor, com evidências e indicação de revisão humana.</p></div>
         <div class="empty-state" id="analysis-empty"><div class="empty-icon" aria-hidden="true">✓</div><h2>Nenhuma análise disponível</h2><p>Informe uma URL na página inicial para começar uma análise local.</p><a class="secondary-button" href="#inicio">Voltar para início</a></div>
         <div class="results-shell" id="analysis-results" hidden>
-          <div class="results-summary"><div><span class="summary-label">URL analisada</span><strong id="result-url">—</strong></div><span class="status-chip status-review">Aguardando integração</span></div>
-          <div class="result-grid"><article class="result-card"><span class="result-icon" aria-hidden="true">◌</span><div><h2>Resultados do motor</h2><p>Este espaço será preenchido pelo relatório real, sem resultados simulados.</p></div></article><article class="result-card"><span class="result-icon" aria-hidden="true">◉</span><div><h2>Imagens encontradas</h2><p>A classificação contextual de imagens será exibida quando o snapshot estiver disponível.</p></div></article></div>
+          <div class="results-summary"><div><span class="summary-label">URL analisada</span><strong id="result-url">—</strong></div><span class="status-chip status-review" id="result-status">Análise concluída</span></div>
+          <div class="result-grid">
+            <article class="result-card"><span class="result-icon" aria-hidden="true">◌</span><div><h2>Resumo da auditoria</h2><p id="audit-summary">—</p></div></article>
+            <article class="result-card"><span class="result-icon" aria-hidden="true">◉</span><div><h2>Imagens encontradas</h2><p id="image-summary">—</p></div></article>
+          </div>
+          <div class="result-card" style="margin-top:1rem;display:block"><h2>Resultados por critério</h2><div id="rule-results" class="result-list" aria-live="polite"></div></div>
+          <div class="result-card" style="margin-top:1rem;display:block"><h2>Classificação contextual de imagens</h2><div id="image-results" class="result-list" aria-live="polite"></div></div>
         </div>
       </section>
 

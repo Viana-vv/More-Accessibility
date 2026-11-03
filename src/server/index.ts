@@ -11,6 +11,33 @@ import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
 export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; staticRoot?: string; logoPath?: string; }
 export interface RunningServer { server: Server; url: string; close: () => Promise<void>; }
 
+class PreviewError extends Error { constructor(readonly status: number, message: string) { super(message); this.name = 'PreviewError'; } }
+const MAX_PREVIEW_BYTES = 5 * 1024 * 1024;
+
+async function fetchImagePreview(input: string, timeoutMs: number): Promise<{ bytes: Buffer; contentType: string }> {
+  let current = (await validateExternalUrl(input)).url;
+  for (let redirect = 0; redirect <= 3; redirect += 1) {
+    const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs), headers: { accept: 'image/*' } });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new PreviewError(502, 'Redirecionamento de preview sem destino.');
+      if (redirect === 3) throw new PreviewError(502, 'Quantidade de redirecionamentos excedida.');
+      current = (await validateExternalUrl(new URL(location, current).href)).url;
+      continue;
+    }
+    if (!response.ok) throw new PreviewError(502, `Origem do preview respondeu HTTP ${response.status}.`);
+    const contentType = ((response.headers.get('content-type') ?? '').split(';', 1)[0] ?? '').trim().toLowerCase();
+    if (!contentType.startsWith('image/')) throw new PreviewError(415, 'Preview externo aceita somente conteúdo de imagem; HTML não é executado.');
+    const declared = Number(response.headers.get('content-length') ?? 0);
+    if (declared > MAX_PREVIEW_BYTES) throw new PreviewError(413, 'Imagem excede o limite de preview.');
+    if (!response.body) throw new PreviewError(502, 'Origem do preview não retornou conteúdo.');
+    const chunks: Buffer[] = []; let size = 0;
+    for await (const chunk of response.body) { const data = Buffer.from(chunk); size += data.length; if (size > MAX_PREVIEW_BYTES) throw new PreviewError(413, 'Imagem excede o limite de preview.'); chunks.push(data); }
+    return { bytes: Buffer.concat(chunks), contentType };
+  }
+  throw new PreviewError(502, 'Preview não pôde ser obtido.');
+}
+
 function json(response: http.ServerResponse, status: number, body: unknown): void { response.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); response.end(JSON.stringify(body)); }
 async function body(request: http.IncomingMessage, maxBytes: number): Promise<string> {
   const chunks: Buffer[] = []; let size = 0;
@@ -37,6 +64,13 @@ export function createLocalServer(options: ServerOptions = {}): Server {
         } catch { return json(response, 404, { error: 'Recurso não encontrado.' }); }
       }
       if (request.method === 'GET' && path === '/health') return json(response, 200, { ok: true });
+      if (request.method === 'GET' && path === '/api/preview') {
+        const target = new URL(request.url ?? '/', 'http://localhost').searchParams.get('url');
+        if (!target) return json(response, 400, { error: 'O parâmetro url é obrigatório.' });
+        const preview = await fetchImagePreview(target, options.timeoutMs ?? 10000);
+        response.writeHead(200, { 'content-type': preview.contentType, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'content-disposition': 'inline' });
+        response.end(preview.bytes); return;
+      }
       if (request.method !== 'POST' || path !== '/api/analyze') return json(response, 404, { error: 'Rota não encontrada.' });
       const parsed = JSON.parse(await body(request, maxBytes)) as { url?: unknown };
       if (typeof parsed.url !== 'string') return json(response, 400, { error: 'O campo url é obrigatório.' });
@@ -49,6 +83,7 @@ export function createLocalServer(options: ServerOptions = {}): Server {
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });
+      if (error instanceof PreviewError) return json(response, error.status, { error: error.message });
       if (error instanceof CaptureError) return json(response, 200, { snapshot: error.snapshot ?? { url: '', title: '', elements: [], images: [], capturedAt: new Date().toISOString(), captureState: error.state, captureMessage: error.message } });
       return json(response, 502, { error: error instanceof Error ? error.message : 'Falha ao analisar a página.' });
     }

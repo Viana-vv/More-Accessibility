@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import pathUtil from 'node:path';
 import type { RenderedPageSnapshot } from '../shared/contracts.js';
 import { auditSnapshot } from '../engine/index.js';
-import { captureRenderedPage, type CdpSnapshotOptions } from './cdp.js';
+import { captureRenderedPage, CaptureError, type CdpSnapshotOptions } from './cdp.js';
 import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
 
 export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; staticRoot?: string; logoPath?: string; }
@@ -41,10 +41,11 @@ export function createLocalServer(options: ServerOptions = {}): Server {
       if (typeof parsed.url !== 'string') return json(response, 400, { error: 'O campo url é obrigatório.' });
       const safe = await validateExternalUrl(parsed.url);
       const snapshot = options.fixture ? typeof options.fixture === 'function' ? await options.fixture() : options.fixture : await captureRenderedPage(safe.url.href, options);
-      return json(response, 200, { snapshot, report: auditSnapshot(snapshot) });
+      return json(response, 200, snapshot.captureState === 'captured' || snapshot.captureState === undefined ? { snapshot, report: auditSnapshot(snapshot) } : { snapshot });
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });
+      if (error instanceof CaptureError) return json(response, 200, { snapshot: error.snapshot ?? { url: '', title: '', elements: [], images: [], capturedAt: new Date().toISOString(), captureState: error.state, captureMessage: error.message } });
       return json(response, 502, { error: error instanceof Error ? error.message : 'Falha ao analisar a página.' });
     }
   });

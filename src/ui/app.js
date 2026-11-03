@@ -1,3 +1,5 @@
+import { CATEGORIES, categoryFor, filterResults, summarizeCategories } from './filter-model.js';
+
 (() => {
   const links = [...document.querySelectorAll('[data-view]')];
   const views = [...document.querySelectorAll('.view')];
@@ -15,7 +17,8 @@
   const modalTitle = document.querySelector('#modal-title');
   const modalPanel = document.querySelector('.modal-panel');
   let currentResults = [];
-  let activeFilter = 'all';
+  let activeStatus = 'all';
+  let activeCategory = 'all';
   let lastFocusedElement;
   let lastReport;
   let currentSuggestions = [];
@@ -57,24 +60,13 @@
     failures.forEach((failure) => { const item = make('article', 'result-card'); item.append(make('div', '', `Falha — ${failure.target?.url || 'URL não informada'} — ${failure.message}`)); list.append(item); });
   }
 
-  function categoryFor(item) {
-    const criterion = String(item.criterion || '');
-    if (criterion === '1.4.3' || criterion === '1.4.6') return 'Textos e contraste';
-    if (criterion === '4.1.2' || criterion === '2.5.8') return 'Botões e controles';
-    if (criterion === '2.4.4') return 'Links';
-    if (criterion === '1.1.1') return 'Imagens';
-    if (criterion === '3.3.2') return 'Formulários';
-    if (criterion === '1.3.1') return 'Estrutura semântica';
-    if (criterion === '2.4.7' || criterion === '2.4.11') return 'Navegação e teclado';
-    return 'Outros problemas';
-  }
-
-  function filteredResults() { return currentResults.filter((item) => (item.status === 'violation' || item.status === 'review') && (activeFilter === 'all' || item.status === activeFilter)); }
+  function filteredResults() { return filterResults(currentResults, { status: activeStatus, category: activeCategory }); }
   function drawCategories() {
-    const counts = new Map(); currentResults.forEach((item) => { const category = categoryFor(item); const count = counts.get(category) || { violation: 0, review: 0 }; if (item.status === 'violation') count.violation += 1; if (item.status === 'review') count.review += 1; counts.set(category, count); });
-    categoryList.replaceChildren(...[...counts.entries()].map(([name, count]) => { const button = make('button', 'category-button', `${name} — ${count.violation} violação(ões), ${count.review} revisão(ões)`); button.type = 'button'; button.addEventListener('click', () => { activeFilter = 'category:' + name; drawResults(); }); return button; }));
+    const counts = summarizeCategories(currentResults);
+    const icons = { [CATEGORIES.contrast]: 'Aa', [CATEGORIES.images]: '▧', [CATEGORIES.controls]: '◉', [CATEGORIES.links]: '↗', [CATEGORIES.forms]: '▤', [CATEGORIES.structure]: '≡', [CATEGORIES.other]: '•' };
+    categoryList.replaceChildren(...Object.entries(counts).map(([name, count]) => { const button = make('button', 'category-button'); button.type = 'button'; button.dataset.category = name; button.setAttribute('aria-pressed', String(activeCategory === name)); button.append(make('span', 'category-icon', icons[name] || '•'), make('span', 'category-label', name), make('span', 'category-count', String(count.total))); button.addEventListener('click', () => { activeCategory = activeCategory === name ? 'all' : name; drawCategories(); drawResults(); }); return button; }));
   }
-  function drawResults() { const results = filteredResults().filter((item) => !activeFilter.startsWith('category:') || categoryFor(item) === activeFilter.slice(9)); document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`; ruleResults.replaceChildren(...(results.length ? results.map((item) => renderOccurrence(item, false)) : [make('p', 'empty-result', 'Nenhum problema corresponde ao filtro selecionado.')])); }
+  function drawResults() { const results = filteredResults(); document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`; ruleResults.replaceChildren(...(results.length ? results.map((item) => renderOccurrence(item, false)) : [make('p', 'empty-result', 'Nenhum problema corresponde ao filtro selecionado.')])); }
 
   function openModal(item, opener) { lastFocusedElement = opener || document.activeElement; modalTitle.textContent = `${text(item.criterion)} · ${text(item.ruleId)}`; const details = renderOccurrence(item, false); details.open = true; modalContent.replaceChildren(details.querySelector('.criterion-body').cloneNode(true)); modal.hidden = false; modalPanel.focus(); }
   function closeModal() { modal.hidden = true; modalContent.replaceChildren(); lastFocusedElement?.focus(); }
@@ -170,7 +162,8 @@
     lastReport = report;
     currentSuggestions = suggestions.length ? suggestions : (report.suggestions || report._suggestions || []);
     currentResults = results.filter((item) => item.status === 'violation' || item.status === 'review');
-    activeFilter = 'all';
+    activeStatus = 'all';
+    activeCategory = 'all';
     const images = captureBlocked ? [] : (snapshot.images || []);
     const counts = results.reduce((acc, item) => { acc[item.status] = (acc[item.status] || 0) + 1; return acc; }, {});
     resultUrl.textContent = text(report?.target?.url);
@@ -189,7 +182,7 @@
   }
 
   window.addEventListener('hashchange', route);
-  document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => { activeFilter = button.dataset.filter || 'all'; document.querySelectorAll('.filter-button').forEach((item) => item.classList.toggle('is-active', item === button)); drawResults(); }));
+  document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => { activeStatus = button.dataset.filter || 'all'; document.querySelectorAll('.filter-button').forEach((item) => { item.classList.toggle('is-active', item === button); item.setAttribute('aria-pressed', String(item === button)); }); drawResults(); }));
   document.querySelector('#modal-close')?.addEventListener('click', closeModal);
   document.querySelector('[data-close-modal]')?.addEventListener('click', closeModal);
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal && !modal.hidden) { closeModal(); return; } if (event.key === 'Tab' && modal && !modal.hidden) { const focusable = [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]; if (!focusable.length) return; const first = focusable[0]; const last = focusable[focusable.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } } });

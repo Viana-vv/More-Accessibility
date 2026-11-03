@@ -5,7 +5,7 @@ export interface AuditHistoryState { validReports: AuditReport[]; failedAudits: 
 export interface HistoryStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; }
 class MemoryStorage implements HistoryStorage { private readonly values = new Map<string, string>(); getItem(key: string): string | null { return this.values.get(key) ?? null; } setItem(key: string, value: string): void { this.values.set(key, value); } }
 function emptyState(): AuditHistoryState { return { validReports: [], failedAudits: [] }; }
-function validReport(report: AuditReport): boolean { try { const url = new URL(report.target.url); return (url.protocol === 'http:' || url.protocol === 'https:') && report.snapshot.url === report.target.url && report.results.every((result) => typeof result.ruleId === 'string' && typeof result.status === 'string'); } catch { return false; } }
+function validReport(report: AuditReport): boolean { try { const target = new URL(report.target.url); const loaded = new URL(report.snapshot.url); return (target.protocol === 'http:' || target.protocol === 'https:') && (loaded.protocol === 'http:' || loaded.protocol === 'https:') && report.captureState !== 'blocked' && report.captureState !== 'authentication-required' && report.captureState !== 'network-error' && report.captureState !== 'timeout' && report.captureState !== 'content-unavailable' && report.results.every((result) => typeof result.ruleId === 'string' && typeof result.status === 'string'); } catch { return false; } }
 
 export class AuditHistory {
   private state: AuditHistoryState; private readonly storage: HistoryStorage; private readonly key: string;

@@ -28,7 +28,8 @@ test('integra servidor local, fixture real e motor sem inventar captura', async 
     assert.equal(response.status, 200);
     const payload = await response.json();
     assert.equal(payload.report.snapshot.captureState, 'captured');
-    assert.equal(payload.report.target.url, snapshot.url);
+    assert.equal(payload.report.target.url, 'https://example.com/quality-page.html');
+    assert.equal(payload.report.snapshot.url, snapshot.url);
     assert.ok(Array.isArray(payload.report.results));
   } finally { await running.close(); }
 });

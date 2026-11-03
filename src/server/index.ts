@@ -41,7 +41,10 @@ export function createLocalServer(options: ServerOptions = {}): Server {
       if (typeof parsed.url !== 'string') return json(response, 400, { error: 'O campo url é obrigatório.' });
       const safe = await validateExternalUrl(parsed.url);
       const snapshot = options.fixture ? typeof options.fixture === 'function' ? await options.fixture() : options.fixture : await captureRenderedPage(safe.url.href, options);
-      return json(response, 200, snapshot.captureState === 'captured' || snapshot.captureState === undefined ? { snapshot, report: auditSnapshot(snapshot) } : { snapshot });
+      if (snapshot.captureState !== 'captured' && snapshot.captureState !== undefined) return json(response, 200, { snapshot });
+      const report = auditSnapshot(snapshot);
+      report.target.url = safe.url.href;
+      return json(response, 200, { snapshot, report });
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });

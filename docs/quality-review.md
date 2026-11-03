@@ -30,3 +30,9 @@ Também não há ferramenta de subagentes disponível nesta sessão.
 ## Próximos critérios de aprovação
 
 Quando os módulos forem integrados, o Agente 5 deve substituir/estender os testes de fixture para chamar o servidor e motor reais, verificar bloqueio de redirecionamentos e DNS rebinding, validar timeout/encerramento CDP, conferir os dez resultados por `elementId`, e executar uma auditoria manual de teclado e contraste da UI.
+
+## Atualização da revisão integrada
+
+Os módulos agora estão presentes e os testes de integração com fixture passam. A execução oficial permanece bloqueada por erros de build TypeScript: `src/engine/rules.ts` foi removido no worktree atual; `ImageCandidate` não declara `isCssBackground`; `auditSnapshot` não fornece `captureState`; e fixtures TypeScript existentes não fornecem `captureState`/`occurrenceId`.
+
+A exportação coberta nesta entrega é serialização JSON local; não há ainda rota ou comando de download de relatório. A captura que falha retorna HTTP 502 sem relatório, evitando auditoria falsa, mas os estados estruturados de timeout, bloqueio e conteúdo indisponível ainda devem ser verificados no CDP e expostos à UI.

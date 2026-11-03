@@ -2,13 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { categoryFor, filterResults, summarizeCategories, CATEGORIES } from '../src/ui/filter-model.js';
 
-test('IDs de categorias são estáveis e independentes dos rótulos localizados', () => {
-  assert.equal(CATEGORIES.contrast, 'text-contrast');
-  assert.equal(CATEGORIES.images, 'images');
-  assert.equal(CATEGORIES.controls, 'controls');
-  assert.equal(CATEGORIES.structure, 'structure-navigation');
-});
-
 const results = [
   { occurrenceId: 'link-1', criterion: '2.4.4', status: 'violation' },
   { occurrenceId: 'link-2', criterion: '2.4.4', status: 'review' },

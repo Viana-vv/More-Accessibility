@@ -1,5 +1,4 @@
 import type { AccessibilityEvidence, RenderedElement, RuleResult } from '../shared/contracts.js';
-import type { StructuredCategoryKey } from './types.js';
 
 export function evidence(kind: string, value: string, source?: string): AccessibilityEvidence {
   return source === undefined ? { kind, value } : { kind, value, source };
@@ -27,11 +26,10 @@ export function selectorFor(element: RenderedElement): string {
 function escapeSelector(value: string): string { return value.replace(/(["\\])/g, '\\$1'); }
 
 export interface ResultMetadata { occurrenceKey: string; impact: string; remediation: string; expectedResult: string; correctedHtml?: string; }
-export function makeResult(ruleId: string, criterion: string, description: string, level: RuleResult['level'], status: RuleResult['status'], target: RenderedElement, evidenceList: AccessibilityEvidence[], metadata: ResultMetadata): RuleResult & { categoryKey: StructuredCategoryKey } {
+export function makeResult(ruleId: string, criterion: string, description: string, level: RuleResult['level'], status: RuleResult['status'], target: RenderedElement, evidenceList: AccessibilityEvidence[], metadata: ResultMetadata): RuleResult {
   return {
-    categoryKey: { criterion, rule: ruleId, elementId: target.id, kind: ruleId.split('-').at(-1) ?? 'element' },
     occurrenceId: stableId(`${ruleId}|${metadata.occurrenceKey}`), ruleId, criterion, description, level, status, evidence: evidenceList,
     selector: selectorFor(target), impact: metadata.impact, html: target.html, remediation: metadata.remediation, expectedResult: metadata.expectedResult,
     ...(metadata.correctedHtml === undefined ? {} : { correctedHtml: metadata.correctedHtml }),
-  } as RuleResult & { categoryKey: StructuredCategoryKey; occurrenceId: string };
+  };
 }

@@ -1,17 +1,22 @@
-﻿# Arquitetura e validação
+# Arquitetura inicial
 
-- `src/shared`: contratos entre captura, motor, interface, comparações e relatórios.
-- `src/server`: servidor HTTP local, defesa anti-SSRF, CDP sem Playwright/Puppeteer, prévias seguras e integração do histórico persistente.
-- `src/engine`: regras WCAG próprias, evidências e classificação contextual de imagens.
-- `src/ui`: aplicação responsiva, assets originais e SVGs oficiais do Regen Icons.
-- `src/comparisons`: sugestões de correção baseadas nas evidências do motor.
-- `src/reports`: histórico local em arquivo e exportação.
-- `tests`: testes unitários, de integração, regressão e harness CDP nativo.
+## Escopo
 
-O histórico persistente é fornecido a `startLocalServer` pelo entrypoint `src/server/main.ts`; cada captura concluída recebe ID e é gravada em `data/audit-history.json`. Falhas de captura são registradas separadamente. A API `GET /api/history` alimenta a interface após navegação ou recarga.
+Aplicação local para analisar somente a URL fornecida pelo usuário, coletando dados do DOM renderizado via Chrome DevTools Protocol e avaliando regras próprias baseadas na WCAG 2.2. Não há rastreamento automático de outras páginas.
 
-## Qualidade e responsividade
+## Módulos
 
-`tests/ui-cdp.test.mjs` usa CDP nativo e uma instância isolada do Edge em porta dedicada para abrir a UI real, navegar pelas rotas, medir o documento e validar a interface nos viewports documentados em `README.md`. O teste não pode usar uma sessão CDP que contenha abas do usuário. Se não houver CDP configurado, ele é explicitamente ignorado e não conta como validação de responsividade.
+- `src/shared`: contratos agnósticos de transporte entre servidor, motor, interface e comparações.
+- `src/server`: HTTP local, validação anti-SSRF e sessão CDP sem Playwright/Puppeteer.
+- `src/engine`: regras WCAG e classificação contextual de imagens.
+- `src/ui`: interface escura, acessível e responsiva baseada nos PNGs fornecidos.
+- `src/comparisons`: sugestões fundamentadas em evidências reais do motor.
+- `tests`: testes unitários, integração e páginas-problema.
 
-A verificação de 200% e espaçamento de texto é automatizada por simulação CSS; ela não substitui o zoom nativo nem inspeção manual. `docs/quality-review.md` registra os testes executados e as verificações manuais ainda pendentes.
+## Dependências e ordem
+
+`server -> engine -> ui -> comparisons -> reports`. O contrato compartilhado é a fronteira; módulos podem usar fixtures enquanto a dependência ainda não está integrada.
+
+## Isolamento
+
+Cada frente deve trabalhar em branch/worktree próprio e alterar apenas seu escopo. Alterações em `src/shared/contracts.ts` exigem revisão do coordenador.

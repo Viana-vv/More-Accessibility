@@ -3,4 +3,3 @@ dist/
 .worktrees/
 *.tsbuildinfo
 package-lock.json
-data/audit-history.json

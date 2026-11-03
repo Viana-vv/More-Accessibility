@@ -1,58 +1,61 @@
 import type { AccessibilityEvidence, AuditReport, CorrectionSuggestion, ImageAnalysis, RuleResult } from '../shared/contracts.js';
-import { contrastRatio, contrastThreshold, parseStructuredContrastEvidence, suggestContrastColors, type StructuredContrastEvidence } from './colors.js';
+import { contrastRatio, parseColor, suggestContrastColors } from './colors.js';
 
-export interface ContrastComparison { before: number; after: number; minimum: number; foreground: string; background: string; suggestedForeground?: string; suggestedBackground?: string; fontSizePx?: number; fontWeight?: number | string; }
-export interface ContrastPreviewTokens { before: { foreground: string; background: string }; after: { foreground: string; background: string }; }
-export interface ComparisonSuggestion extends CorrectionSuggestion { expectedResult: string; contrast?: ContrastComparison; previewTokens?: ContrastPreviewTokens; }
+export interface ContrastComparison { before: number; after: number; minimum: number; }
+export interface ComparisonSuggestion extends CorrectionSuggestion { expectedResult: string; contrast?: ContrastComparison; }
 
-function evidence(result: RuleResult, kinds: string[]): string | undefined { return result.evidence.find((item) => kinds.includes(item.kind))?.value; }
+function evidenceText(evidence: AccessibilityEvidence[]): string { return evidence.map((item) => `${item.kind} ${item.value} ${item.source ?? ''}`).join(' '); }
+function firstEvidence(result: RuleResult, kinds: string[]): string | undefined { return result.evidence.find((item) => kinds.includes(item.kind))?.value; }
+function colorPair(result: RuleResult): [string, string] | undefined {
+  const colors = evidenceText(result.evidence).match(/#[\da-f]{3,8}\b|rgba?\([^)]*\)/gi) ?? [];
+  if (colors.length < 2 || !parseColor(colors[0]!) || !parseColor(colors[1]!)) return undefined;
+  return [colors[0]!, colors[1]!];
+}
 function baseSuggestion(result: RuleResult): ComparisonSuggestion {
   const suggestion: ComparisonSuggestion = { ruleId: result.ruleId, title: `Revisar ${result.criterion}`, rationale: result.remediation ?? `${result.description} Confirme a correção com as evidências coletadas.`, humanReviewRequired: result.status === 'review', expectedResult: result.status === 'review' ? 'A situação deve ser confirmada por revisão humana.' : 'O critério deve deixar de apresentar violação confirmada.' };
-  const before = evidence(result, ['element-html', 'html']); if (before !== undefined) suggestion.before = before;
+  const before = firstEvidence(result, ['element-html', 'html', 'before', 'computed-style', 'contrast-ratio']);
+  if (before !== undefined) suggestion.before = before;
   return suggestion;
 }
-function explicitHtml(result: RuleResult, kind: string): string | undefined { const item = result.evidence.find((candidate) => candidate.kind === kind); return item?.value.includes('<') ? item.value : undefined; }
+function codeEvidence(result: RuleResult, kinds: string[]): string | undefined { const value = firstEvidence(result, kinds); return value?.includes('<') ? value : undefined; }
 
 function contrastSuggestion(result: RuleResult, base: ComparisonSuggestion): ComparisonSuggestion {
-  const structured = parseStructuredContrastEvidence(result.evidence);
-  if (!structured) return { ...base, title: 'Ajustar contraste com evidência estruturada', rationale: `${base.rationale} Não foi possível calcular uma sugestão porque não há evidência estruturada com foreground, background e dados tipográficos válidos.`, expectedResult: 'A proporção deve atingir o limiar calculado para o tamanho e peso do texto.', humanReviewRequired: true };
-  return contrastSuggestionFromEvidence(result, base, structured);
+  const pair = colorPair(result);
+  if (!pair) return { ...base, title: 'Ajustar contraste com as cores reais observadas', rationale: `${base.rationale} As evidências não contêm as duas cores computadas, portanto nenhuma cor foi inventada.`, expectedResult: 'A proporção deve atingir pelo menos 4,5:1 para texto normal ou o mínimo aplicável ao tamanho do texto.', humanReviewRequired: true };
+  const target = result.criterion.includes('1.4.6') ? 7 : 4.5;
+  const current = contrastRatio(pair[0], pair[1]);
+  const proposed = suggestContrastColors(pair[0], pair[1], target);
+  if (current === undefined || proposed === undefined) return { ...base, title: 'Ajustar contraste com as cores observadas', expectedResult: `A proporção deve atingir pelo menos ${target}:1.`, humanReviewRequired: true };
+  return { ...base, title: `Ajustar contraste para ${target}:1`, rationale: `A proporção observada foi ${current.toFixed(2)}:1. A sugestão altera somente ${proposed.changed === 'foreground' ? 'a cor do texto' : 'a cor de fundo'} e preserva a outra cor quando possível.`, css: `color: ${proposed.foreground};\nbackground-color: ${proposed.background};`, after: `${proposed.foreground} sobre ${proposed.background}`, expectedResult: `A proporção esperada é ${proposed.ratio.toFixed(2)}:1, atendendo ao mínimo de ${target}:1.`, contrast: { before: current, after: proposed.ratio, minimum: target }, humanReviewRequired: false };
 }
-
-export function contrastSuggestionFromEvidence(result: RuleResult, base: ComparisonSuggestion, structured: StructuredContrastEvidence): ComparisonSuggestion {
-  const minimum = contrastThreshold(structured);
-  const before = contrastRatio(structured.foreground, structured.background);
-  if (before === undefined) return { ...base, title: 'Ajustar contraste com as cores observadas', expectedResult: `A proporção deve atingir pelo menos ${minimum}:1.`, humanReviewRequired: true };
-  const proposed = suggestContrastColors(structured.foreground, structured.background, minimum);
-  if (!proposed) return { ...base, title: 'Ajustar contraste com as cores observadas', expectedResult: `A proporção deve atingir pelo menos ${minimum}:1.`, humanReviewRequired: true };
-  const css = `color: ${proposed.foreground};\nbackground-color: ${proposed.background};`;
-  const contrast: ContrastComparison = { before, after: proposed.ratio, minimum, foreground: structured.foreground, background: structured.background, suggestedForeground: proposed.foreground, suggestedBackground: proposed.background };
-  if (structured.fontSizePx !== undefined) contrast.fontSizePx = structured.fontSizePx;
-  if (structured.fontWeight !== undefined) contrast.fontWeight = structured.fontWeight;
-  return { ...base, title: `Ajustar contraste para ${minimum}:1`, rationale: `A proporção calculada foi ${before.toFixed(2)}:1. A CSS sugerida altera ${proposed.changed === 'foreground' ? 'foreground' : 'background'} e preserva a outra cor.`, css, after: css, expectedResult: `A proporção esperada é ${proposed.ratio.toFixed(2)}:1, atendendo ao mínimo de ${minimum}:1.`, contrast, previewTokens: { before: { foreground: structured.foreground, background: structured.background }, after: { foreground: proposed.foreground, background: proposed.background } }, humanReviewRequired: false };
-}
-
 function controlSuggestion(result: RuleResult, base: ComparisonSuggestion): ComparisonSuggestion {
-  const corrected = explicitHtml(result, 'corrected-html');
-  const suggestion: ComparisonSuggestion = { ...base, title: 'Fornecer um nome acessível ao controle', rationale: `${base.rationale} O nome deve usar texto real, aria-label ou aria-labelledby observado; nenhum rótulo foi inventado.`, expectedResult: 'O botão ou link deve expor um nome acessível que comunique sua finalidade.' };
-  if (corrected !== undefined) { suggestion.html = corrected; suggestion.after = corrected; }
+  const html = codeEvidence(result, ['corrected-html', 'suggested-html']);
+  const original = codeEvidence(result, ['element-html', 'html']);
+  const suggestion: ComparisonSuggestion = { ...base, title: 'Fornecer um nome acessível ao controle', rationale: `${base.rationale} O nome deve vir do texto real, de aria-label ou de aria-labelledby observado no contexto; nenhum rótulo foi inventado.`, expectedResult: 'O botão ou link deve expor um nome acessível que comunique sua finalidade.' };
+  if (original !== undefined) suggestion.before = original;
+  if (html !== undefined) { suggestion.html = html; suggestion.after = html; }
   return suggestion;
 }
 function formSuggestion(result: RuleResult, base: ComparisonSuggestion): ComparisonSuggestion {
-  const corrected = explicitHtml(result, 'corrected-html');
-  const suggestion: ComparisonSuggestion = { ...base, title: 'Associar o campo ao seu rótulo', rationale: `${base.rationale} Use o id e o texto real coletados. Nenhum label foi fabricado por este módulo.`, expectedResult: 'Cada campo deve ter um rótulo ou instrução perceptível e programaticamente associado.' };
-  if (corrected !== undefined) { suggestion.html = corrected; suggestion.after = corrected; }
+  const html = codeEvidence(result, ['corrected-html', 'suggested-html']);
+  const original = codeEvidence(result, ['element-html', 'html']);
+  const suggestion: ComparisonSuggestion = { ...base, title: 'Associar o campo ao seu rótulo', rationale: `${base.rationale} Use o id real do campo e o texto real do rótulo coletado. Como esses valores não estão presentes no contrato, nenhum label foi fabricado.`, expectedResult: 'Cada campo deve ter um rótulo ou instrução perceptível e programaticamente associado.' };
+  if (original !== undefined) suggestion.before = original;
+  if (html !== undefined) { suggestion.html = html; suggestion.after = html; }
   return suggestion;
 }
 function imageSuggestion(image: ImageAnalysis): ComparisonSuggestion {
-  const suggestion: ComparisonSuggestion = { ruleId: image.relatedCriteria[0] ?? '1.1.1', title: 'Revisar finalidade e alternativa da imagem', rationale: image.evidence.map((item) => `${item.kind}: ${item.value}`).join('; ') || 'Nenhuma evidência textual foi coletada.', before: image.html, humanReviewRequired: true, expectedResult: 'A alternativa deve representar a finalidade real, ou a imagem deve ser decorativa somente quando isso for confirmado.' };
-  if (image.purpose === 'decorative') { const html = image.html.replace(/\s+alt\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, ' alt=""'); suggestion.title = 'Marcar a imagem como decorativa após confirmação'; suggestion.rationale = `O motor sugeriu decoração; isso não prova a finalidade. Evidências: ${suggestion.rationale}`; suggestion.html = html; suggestion.after = html; suggestion.expectedResult = 'A imagem decorativa deve ter alt="" e não transmitir informação necessária.'; }
-  else if (image.purpose === 'informative') { suggestion.title = 'Confirmar a alternativa textual da imagem'; suggestion.rationale = `A imagem parece informativa; o motor não consegue confirmar se a alternativa corresponde à finalidade. Nenhum texto foi inventado. ${image.issues.join(' ')}`.trim(); suggestion.expectedResult = 'A alternativa deve transmitir a informação relevante e adequada ao contexto.'; }
-  else if (image.purpose === 'functional') { suggestion.title = 'Validar o nome acessível do controle'; suggestion.rationale = `A imagem participa de uma ação interativa. ${image.issues.join(' ')}`.trim(); suggestion.expectedResult = 'O link ou botão deve expor um nome acessível que identifique a ação, sem redundância com a imagem.'; }
-  else { suggestion.title = 'Confirmar a finalidade da imagem'; suggestion.rationale = `A finalidade é indeterminada. Evidências: ${suggestion.rationale}`; }
+  const suggestion: ComparisonSuggestion = { ruleId: image.relatedCriteria[0] ?? '1.1.1', title: 'Revisar finalidade e alternativa da imagem', rationale: image.evidence.map((item) => `${item.kind}: ${item.value}`).join('; ') || 'Nenhuma evidência textual foi coletada.', before: image.html, humanReviewRequired: true, expectedResult: 'A alternativa deve representar a finalidade real da imagem, ou a imagem deve ser marcada como decorativa somente quando isso for confirmado.' };
+  if (image.purpose === 'decorative') {
+    const html = image.html.replace(/\s+alt\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/i, ' alt=""');
+    suggestion.title = 'Marcar a imagem como decorativa após confirmação'; suggestion.rationale = `O motor sugeriu decoração. Isso não prova a finalidade: ${suggestion.rationale}`; suggestion.html = html; suggestion.after = html; suggestion.expectedResult = 'A imagem decorativa deve ter alt="" e não transmitir informação necessária.';
+  } else if (image.purpose === 'informative-or-functional') {
+    suggestion.title = 'Validar alternativa ou nome acessível da imagem'; suggestion.rationale = `A imagem foi classificada como informativa ou funcional. Não será inventado texto alternativo. ${image.issues.join(' ')}`.trim();
+    if (image.suggestedFix?.includes('<')) { suggestion.html = image.suggestedFix; suggestion.after = image.suggestedFix; }
+    suggestion.expectedResult = 'A imagem deve ter alternativa textual adequada ou o controle ancestral deve ter nome acessível sem redundância.';
+  } else { suggestion.title = 'Confirmar a finalidade da imagem'; suggestion.rationale = `A finalidade é indeterminada. Evidências: ${suggestion.rationale}`; }
   return suggestion;
 }
-
 export function suggestionsForRule(result: RuleResult): ComparisonSuggestion[] {
   if (result.status !== 'violation' && result.status !== 'review') return [];
   const base = baseSuggestion(result); const criterion = result.criterion.toLowerCase();

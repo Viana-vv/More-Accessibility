@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCategories } from './filter-model.js';
+import { CATEGORIES, categoryFor, filterResults, summarizeCategories } from './filter-model.js';
 
 (() => {
   const links = [...document.querySelectorAll('[data-view]')];
@@ -22,7 +22,6 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
   let lastFocusedElement;
   let lastReport;
   let currentSuggestions = [];
-  let cachedHistory;
 
   const captureLabels = {
     captured: 'Captura concluída',
@@ -33,7 +32,7 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
     'content-unavailable': 'Conteúdo indisponível',
   };
   const statusLabels = { pass: 'Aprovado', violation: 'Violação', review: 'Revisão necessária', 'not-applicable': 'Não aplicável' };
-  const purposeLabels = { decorative: 'Decorativa', informative: 'Informativa', functional: 'Funcional', indeterminate: 'Indeterminada' };
+  const purposeLabels = { decorative: 'Decorativa', 'informative-or-functional': 'Informativa ou funcional', indeterminate: 'Indeterminada' };
 
   const escape = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const text = (value, fallback = 'Não informado') => value === undefined || value === null || value === '' ? fallback : String(value);
@@ -48,23 +47,8 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
 
   function route() { const hash = window.location.hash.slice(1); showView(hash === 'analises' ? 'analyses' : hash === 'relatorios' ? 'reports' : 'home'); if (hash === 'relatorios') renderHistory(); if (hash === 'analises' && !lastReport) { const saved = historyState().validReports?.[0]; if (saved) { lastReport = saved; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden'); renderReport(saved); } } }
 
-  function historyState() { if (cachedHistory) return cachedHistory; try { cachedHistory = JSON.parse(localStorage.getItem('wcag-audit-history') || '{"validReports":[],"failedAudits":[]}'); } catch { cachedHistory = { validReports: [], failedAudits: [] }; } return cachedHistory; }
-  function saveHistory(state) { cachedHistory = state; try { localStorage.setItem('wcag-audit-history', JSON.stringify(state)); } catch { status.textContent = 'O histórico foi salvo no servidor local, mas não pôde ser mantido neste navegador.'; } }
-  async function refreshHistory() {
-    try {
-      const response = await fetch('/api/history');
-      if (!response.ok) return;
-      const saved = await response.json();
-      if (saved.persistent) {
-        saveHistory({ validReports: Array.isArray(saved.validReports) ? saved.validReports : [], failedAudits: Array.isArray(saved.failedAudits) ? saved.failedAudits : [] });
-        const warning = document.querySelector('#history-warning');
-        if (warning) { warning.textContent = saved.warning || ''; warning.hidden = !saved.warning; }
-      }
-    } catch { /* O armazenamento local do navegador permanece como fallback. */ }
-    const hash = window.location.hash.slice(1);
-    if (hash === 'relatorios') renderHistory();
-    if (hash === 'analises' && !lastReport) route();
-  }
+  function historyState() { try { return JSON.parse(localStorage.getItem('wcag-audit-history') || '{"validReports":[],"failedAudits":[]}'); } catch { return { validReports: [], failedAudits: [] }; } }
+  function saveHistory(state) { localStorage.setItem('wcag-audit-history', JSON.stringify(state)); }
   function download(name, content, type) { const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type })); link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); }
   function renderHistory() {
     const section = document.querySelector('#relatorios'); if (!section) return;
@@ -79,37 +63,10 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
   function filteredResults() { return filterResults(currentResults, { status: activeStatus, category: activeCategory }); }
   function drawCategories() {
     const counts = summarizeCategories(currentResults);
-    const icons = { [CATEGORIES.contrast]: 'contrast', [CATEGORIES.images]: 'photo', [CATEGORIES.controls]: 'mouse', [CATEGORIES.links]: 'link', [CATEGORIES.forms]: 'file-text', [CATEGORIES.structure]: 'list', [CATEGORIES.other]: 'circle-alert' };
-    categoryList.replaceChildren(...Object.entries(counts).map(([name, count]) => { const button = make('button', 'category-button'); button.type = 'button'; button.dataset.category = name; button.setAttribute('aria-pressed', String(activeCategory === name)); button.setAttribute('aria-label', `${CATEGORY_LABELS[name] || 'Outros'}: ${count.violations} violações e ${count.reviews} revisões humanas`); const icon = document.createElement('img'); icon.className = 'category-icon'; icon.src = `/icons/${icons[name] || 'circle-alert'}.svg`; icon.alt = ''; icon.setAttribute('aria-hidden', 'true'); button.append(icon, make('span', 'category-label', CATEGORY_LABELS[name] || 'Outros'), make('span', 'category-count', String(count.total))); button.addEventListener('click', () => { activeCategory = activeCategory === name ? 'all' : name; drawCategories(); drawResults(); }); return button; }));
+    const icons = { [CATEGORIES.contrast]: 'Aa', [CATEGORIES.images]: '▧', [CATEGORIES.controls]: '◉', [CATEGORIES.links]: '↗', [CATEGORIES.forms]: '▤', [CATEGORIES.structure]: '≡', [CATEGORIES.other]: '•' };
+    categoryList.replaceChildren(...Object.entries(counts).map(([name, count]) => { const button = make('button', 'category-button'); button.type = 'button'; button.dataset.category = name; button.setAttribute('aria-pressed', String(activeCategory === name)); button.append(make('span', 'category-icon', icons[name] || '•'), make('span', 'category-label', name), make('span', 'category-count', String(count.total))); button.addEventListener('click', () => { activeCategory = activeCategory === name ? 'all' : name; drawCategories(); drawResults(); }); return button; }));
   }
-  function drawResults() {
-    const results = filteredResults();
-    document.querySelector('#criteria-count').textContent = `${results.length} ${results.length === 1 ? 'ocorrência' : 'ocorrências'}`;
-    if (!results.length) { ruleResults.replaceChildren(make('p', 'empty-result', 'Nenhum problema corresponde ao filtro selecionado.')); return; }
-    const groups = new Map();
-    for (const item of results) {
-      const key = `${categoryFor(item)}|${item.criterion}|${item.ruleId}`;
-      const group = groups.get(key) || { category: categoryFor(item), criterion: item.criterion, ruleId: item.ruleId, description: item.description, items: [] };
-      group.items.push(item); groups.set(key, group);
-    }
-    ruleResults.replaceChildren(...[...groups.values()].map((group) => {
-      const details = make('details', 'criterion-item');
-      const summary = make('summary');
-      summary.append(make('span', 'criterion-title', `${text(group.description, group.category)} · WCAG ${text(group.criterion)}`));
-      summary.append(make('span', 'section-count', `${group.items.length} ${group.items.length === 1 ? 'ocorrência' : 'ocorrências'}`));
-      const body = make('div', 'criterion-body');
-      const occurrences = make('ul', 'occurrence-list');
-      for (const [index, item] of group.items.entries()) {
-        const row = make('li');
-        const button = make('button', 'occurrence-button');
-        button.type = 'button';
-        button.append(make('span', '', `${index + 1}. ${text(item.selector, item.occurrenceId || 'Elemento sem seletor')}`), make('span', 'status-chip', statusLabels[item.status] || text(item.status)));
-        button.addEventListener('click', () => openModal(item, button));
-        row.append(button); occurrences.append(row);
-      }
-      body.append(occurrences); details.append(summary, body); return details;
-    }));
-  }
+  function drawResults() { const results = filteredResults(); document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`; ruleResults.replaceChildren(...(results.length ? results.map((item) => renderOccurrence(item, false)) : [make('p', 'empty-result', 'Nenhum problema corresponde ao filtro selecionado.')])); }
 
   function openModal(item, opener) { lastFocusedElement = opener || document.activeElement; modalTitle.textContent = `${text(item.criterion)} · ${text(item.ruleId)}`; const details = renderOccurrence(item, false); details.open = true; modalContent.replaceChildren(details.querySelector('.criterion-body').cloneNode(true)); modal.hidden = false; modalPanel.focus(); }
   function closeModal() { modal.hidden = true; modalContent.replaceChildren(); lastFocusedElement?.focus(); }
@@ -140,15 +97,6 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
     const wrapper = make('div', `detail-field ${className}`.trim());
     wrapper.append(make('dt', '', label), make('dd', '', text(value)));
     return wrapper;
-  }
-
-  function imagePreviewSource(value) {
-    let source = String(value || '').trim();
-    const cssUrl = source.match(/url\(\s*(["']?)(.*?)\1\s*\)/i);
-    if (cssUrl) source = cssUrl[2];
-    if (/^https?:\/\//i.test(source)) return `/api/preview?url=${encodeURIComponent(source)}`;
-    if (/^data:image\/(?:png|gif|jpe?g|webp|svg\+xml);/i.test(source)) return source;
-    return '';
   }
 
   function renderOccurrence(item, captureBlocked) {
@@ -195,8 +143,7 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
 
   function renderImage(item) {
     const card = make('article', 'image-card');
-    const previewSource = imagePreviewSource(item.source);
-    if (previewSource) { const image = document.createElement('img'); image.src = previewSource; image.alt = ''; image.loading = 'lazy'; image.addEventListener('error', () => { image.remove(); card.classList.add('image-preview-unavailable'); }); card.append(image); }
+    if (item.source) { const image = document.createElement('img'); image.src = item.source; image.alt = `Miniatura da imagem ${text(item.elementId)}`; image.loading = 'lazy'; card.append(image); }
     const content = make('div', 'image-card-content');
     const heading = make('div', 'image-heading'); heading.append(make('h3', '', text(item.elementId))); heading.append(make('span', `purpose-chip purpose-${item.purpose || 'indeterminate'}`, purposeLabels[item.purpose] || 'Indeterminada')); content.append(heading);
     const grid = make('dl', 'detail-grid'); grid.append(field('Origem', item.source), field('Revisão humana', item.humanReviewRequired ? 'Necessária' : 'Não indicada'), field('Critérios', (item.relatedCriteria || []).join(', '))); content.append(grid);
@@ -225,14 +172,10 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
     captureContext.textContent = captureBlocked ? 'Nenhum resultado WCAG foi atribuído.' : `Documento capturado: “${text(snapshot.title, 'Título não informado')}”.`;
     captureAlert.hidden = !captureBlocked;
     captureAlert.textContent = captureBlocked ? `${captureLabels[captureState] || 'Captura não concluída'}: ${text(report?.captureMessage || snapshot.captureMessage, 'Não foi possível obter o conteúdo analisável.')} Nenhum resultado WCAG foi atribuído.` : '';
-    document.querySelector('#summary-violations').textContent = String(captureBlocked ? 0 : counts.violation || 0);
-    document.querySelector('#summary-reviews').textContent = String(captureBlocked ? 0 : counts.review || 0);
-    document.querySelector('#summary-passes').textContent = String(captureBlocked ? 0 : counts.pass || 0);
-    document.querySelector('#summary-images').textContent = String(images.length);
-    document.querySelector('#audit-summary').textContent = captureBlocked ? 'Auditoria não executada porque a captura não foi concluída.' : `${counts.violation || 0} violações, ${counts.review || 0} revisões humanas, ${counts.pass || 0} aprovações e ${counts['not-applicable'] || 0} itens não aplicáveis.`;
-    document.querySelector('#image-summary').textContent = captureBlocked ? 'As imagens não foram analisadas.' : `${images.length} ${images.length === 1 ? 'imagem analisada' : 'imagens analisadas'}; ${images.filter((item) => item.humanReviewRequired).length} requerem revisão humana.`;
-    document.querySelector('#criteria-count').textContent = `${currentResults.length} ${currentResults.length === 1 ? 'ocorrência' : 'ocorrências'}`;
-    document.querySelector('#images-count').textContent = `${images.length} ${images.length === 1 ? 'imagem' : 'imagens'}`;
+    document.querySelector('#audit-summary').textContent = captureBlocked ? 'Auditoria não executada porque a captura não foi concluída.' : `${counts.violation || 0} violação(ões), ${counts.review || 0} revisão(ões), ${counts.pass || 0} aprovação(ões) e ${counts['not-applicable'] || 0} não aplicável(is).`;
+    document.querySelector('#image-summary').textContent = captureBlocked ? 'As imagens não foram analisadas.' : `${images.length} imagem(ns) encontrada(s); ${images.filter((item) => item.humanReviewRequired).length} exige(m) revisão humana.`;
+    document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`;
+    document.querySelector('#images-count').textContent = `${images.length} imagem(ns)`;
     drawCategories();
     drawResults();
     imageResults.replaceChildren(...(images.length ? images.map(renderImage) : [make('p', 'empty-result', captureBlocked ? 'Sem imagens: a captura não foi concluída.' : 'Nenhuma imagem foi encontrada.') ]));
@@ -242,7 +185,7 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
   document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => { activeStatus = button.dataset.filter || 'all'; document.querySelectorAll('.filter-button').forEach((item) => { item.classList.toggle('is-active', item === button); item.setAttribute('aria-pressed', String(item === button)); }); drawResults(); }));
   document.querySelector('#modal-close')?.addEventListener('click', closeModal);
   document.querySelector('[data-close-modal]')?.addEventListener('click', closeModal);
-  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal && !modal.hidden) { closeModal(); return; } if (event.key === 'Tab' && modal && !modal.hidden) { const focusable = [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]; if (!focusable.length) return; const first = focusable[0]; const last = focusable[focusable.length - 1]; if (event.shiftKey && (document.activeElement === first || document.activeElement === modalPanel)) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === modalPanel)) { event.preventDefault(); first.focus(); } } });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal && !modal.hidden) { closeModal(); return; } if (event.key === 'Tab' && modal && !modal.hidden) { const focusable = [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]; if (!focusable.length) return; const first = focusable[0]; const last = focusable[focusable.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } } });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const url = String(new FormData(form).get('url') ?? '').trim();
@@ -257,5 +200,4 @@ import { CATEGORIES, CATEGORY_LABELS, categoryFor, filterResults, summarizeCateg
     } catch (error) { status.textContent = error instanceof Error ? error.message : 'Falha na análise.'; }
   });
   route();
-  void refreshHistory();
 })();

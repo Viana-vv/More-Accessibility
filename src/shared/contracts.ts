@@ -1,6 +1,6 @@
 export type AuditStatus = 'pass' | 'violation' | 'review' | 'not-applicable';
 export type ConformanceLevel = 'A' | 'AA' | 'AAA';
-export type ImagePurpose = 'decorative' | 'informative-or-functional' | 'indeterminate';
+export type ImagePurpose = 'decorative' | 'informative' | 'functional' | 'indeterminate';
 export type CaptureState = 'captured' | 'authentication-required' | 'blocked' | 'network-error' | 'timeout' | 'content-unavailable';
 
 export interface PageTarget {
@@ -65,10 +65,12 @@ export interface RenderedPageSnapshot {
 }
 
 export interface AuditReport {
+  id?: string;
   target: PageTarget;
   snapshot: RenderedPageSnapshot;
   results: RuleResult[];
   generatedAt: string;
+  suggestions?: CorrectionSuggestion[];
   captureState?: CaptureState;
   captureMessage?: string;
 }

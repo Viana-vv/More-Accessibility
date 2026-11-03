@@ -1,37 +1,34 @@
-# More-Accessibility
-## Analisador local de acessibilidade
+﻿# Execução local
 
-Aplicação local para analisar somente a URL informada, coletando o DOM renderizado por Chrome DevTools Protocol e executando regras próprias baseadas na WCAG 2.2. O projeto não usa axe-core, Lighthouse, Playwright ou Puppeteer e não rastreia outras páginas do domínio.
+Aplicação local para analisar exclusivamente a URL informada pelo usuário. O servidor captura o DOM renderizado com Chrome DevTools Protocol e aplica regras próprias baseadas na WCAG 2.2. Não utiliza axe-core, Lighthouse, Playwright ou Puppeteer e não rastreia outras páginas do domínio.
 
-### Instalação
+## Instalação e execução
+
+Requer Node.js 22 ou posterior e Microsoft Edge ou Chrome instalado.
 
 ```bash
 npm install
-```
-
-### Verificação
-
-```bash
 npm test
-npm run build
-```
-
-### Execução
-
-É necessário ter um Chrome/Chromium com uma porta de depuração CDP disponível para análises reais. Depois do build:
-
-```bash
 npm run dev
 ```
 
-O endpoint `POST /api/analyze` recebe `{ "url": "https://exemplo.com" }`. A resposta contém o snapshot renderizado e o relatório WCAG. `GET /health` verifica o servidor.
+`npm run dev` compila o TypeScript e inicia a aplicação em `http://127.0.0.1:8787`. Se não houver um navegador conectado a CDP na porta 9222, o servidor tenta iniciar Edge/Chrome em modo headless. É possível indicar o executável com `CHROME_PATH`.
 
-### Interface
+## Uso e dados
 
-A referência visual e a logo fornecidas estão na raiz do repositório. A interface em `src/ui` mantém o tema escuro, navegação por teclado, foco visível e estados explícitos para resultados reais, revisão humana e ausência de análises.
+Informe uma URL HTTP(S) na página inicial. O analisador examina somente essa URL. Capturas que falham ficam separadas dos relatórios válidos e não recebem resultados WCAG atribuídos à página.
 
-### Limitações conhecidas
+O histórico persistente fica em `data/audit-history.json`, fora do controle de versão. A interface consulta `GET /api/history`; o servidor oferece `GET /health` para verificação local. Os relatórios podem ser exportados pela tela Relatórios.
+Se o arquivo de histórico estiver corrompido ou em formato incompatível, o servidor inicia com aviso e preserva uma cópia `.invalid-<id>.json` antes de gravar novos dados.
 
-- A captura depende de um Chrome/Chromium local com CDP.
-- Classificação de imagens é contextual e conservadora; não substitui revisão humana.
-- Relatórios persistentes e reconhecimento visual local ainda são extensões futuras.
+## Assets e auditoria
+
+A logo original é disponibilizada em `/logo.png`. Ícones SVG oficiais do Regen Icons são armazenados localmente em `src/ui/icons/`, acompanhados da licença MIT. As auditorias WCAG são implementadas no motor TypeScript próprio.
+
+A classificação de finalidade de imagem é contextual e conservadora. A ferramenta sinaliza revisão humana quando o código coletado não permite determinar a finalidade visual.
+
+## Limitações e validações manuais
+
+A execução CDP automatizada verifica rotas, filtros, modal, exportação e ausência de transbordamento em viewports de 320×568, 360×800, 375×812, 390×844, 430×932, 768×1024, 1024×768, 1366×768 e 1920×1080. Também aplica simulações automatizadas de escala e espaçamento de texto.
+
+Ainda precisam de verificação manual com leitores de tela reais, navegadores/dispositivos móveis, zoom nativo do navegador, modo de alto contraste e avaliação humana de alternativas textuais e conformidade visual completa. A ferramenta não declara conformidade total WCAG.

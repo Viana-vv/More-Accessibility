@@ -1,4 +1,5 @@
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { AuditReport, CaptureState, PageTarget } from '../shared/contracts.js';
 
@@ -13,7 +14,7 @@ export interface AuditFailure {
 }
 
 export interface AuditHistoryState { validReports: AuditReport[]; failedAudits: AuditFailure[]; }
-export interface HistoryStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; }
+export interface HistoryStorage { getItem(key: string): string | null; setItem(key: string, value: string): void; preserveInvalid?(): string | undefined; }
 
 export class HistoryStorageError extends Error { constructor(message: string, options?: { cause?: unknown }) { super(message, options); this.name = 'HistoryStorageError'; } }
 
@@ -34,6 +35,12 @@ export class FileHistoryStorage implements HistoryStorage {
     try { mkdirSync(directory, { recursive: true }); writeFileSync(temporary, value, 'utf8'); renameSync(temporary, this.filePath); }
     catch (error) { throw new HistoryStorageError(`Não foi possível gravar o histórico local: ${this.filePath}`, { cause: error }); }
   }
+  preserveInvalid(): string | undefined {
+    if (!existsSync(this.filePath)) return undefined;
+    const backup = `${this.filePath}.invalid-${randomUUID()}.json`;
+    copyFileSync(this.filePath, backup);
+    return backup;
+  }
 }
 
 function emptyState(): AuditHistoryState { return { validReports: [], failedAudits: [] }; }
@@ -53,16 +60,19 @@ export class AuditHistory {
   private state: AuditHistoryState;
   private readonly storage: HistoryStorage;
   private readonly key: string;
+  loadWarning?: string;
 
   constructor(storage: HistoryStorage = new FileHistoryStorage(), key = 'wcag-audit-history') {
     this.storage = storage; this.key = key;
-    const saved = storage.getItem(key);
+    let saved: string | null;
+    try { saved = storage.getItem(key); }
+    catch (error) { this.state = emptyState(); const backup = storage.preserveInvalid?.(); if (backup) process.emitWarning(`Invalid audit history preserved at ${backup}.`); this.loadWarning = error instanceof Error ? error.message : 'Não foi possível ler o histórico local.'; return; }
     if (!saved) { this.state = emptyState(); return; }
     try {
       const parsed = JSON.parse(saved) as Partial<AuditHistoryState>;
-      if (!Array.isArray(parsed.validReports) || !Array.isArray(parsed.failedAudits)) throw new Error('Formato inválido.');
+      if (!Array.isArray(parsed.validReports) || !Array.isArray(parsed.failedAudits) || !parsed.validReports.every(validReport) || !parsed.failedAudits.every((item) => Boolean(item && typeof item.id === 'string' && validDate(item.occurredAt) && typeof item.message === 'string'))) throw new Error('Formato ou conteúdo inválido.');
       this.state = { validReports: parsed.validReports, failedAudits: parsed.failedAudits };
-    } catch (error) { throw new HistoryStorageError('Histórico local corrompido ou em formato inválido.', { cause: error }); }
+    } catch (error) { this.state = emptyState(); const backup = storage.preserveInvalid?.(); if (backup) process.emitWarning(`Invalid audit history preserved at ${backup}.`); this.loadWarning = new HistoryStorageError('Histórico local corrompido ou em formato incompatível.', { cause: error }).message; }
   }
 
   recordValid(report: AuditReport): void {

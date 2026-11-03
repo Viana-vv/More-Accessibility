@@ -45,3 +45,13 @@ test('relatório com captura inválida não entra no histórico válido', () => 
   assert.equal(history.listValid().length, 0);
 });
 
+
+test('incompatible history is reported without overwriting stored bytes', () => {
+  const storage = new MemoryStorage();
+  const source = '{"validReports":[{"legacy":true}],"failedAudits":[]}';
+  storage.setItem('wcag-audit-history', source);
+  const history = new AuditHistory(storage);
+  assert.equal(history.listValid().length, 0);
+  assert.match(history.loadWarning || '', /incompatível/);
+  assert.equal(storage.getItem('wcag-audit-history'), source);
+});

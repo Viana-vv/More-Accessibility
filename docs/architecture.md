@@ -1,28 +1,17 @@
-# Arquitetura inicial
+﻿# Arquitetura e validação
 
-## Escopo
+- `src/shared`: contratos entre captura, motor, interface, comparações e relatórios.
+- `src/server`: servidor HTTP local, defesa anti-SSRF, CDP sem Playwright/Puppeteer, prévias seguras e integração do histórico persistente.
+- `src/engine`: regras WCAG próprias, evidências e classificação contextual de imagens.
+- `src/ui`: aplicação responsiva, assets originais e SVGs oficiais do Regen Icons.
+- `src/comparisons`: sugestões de correção baseadas nas evidências do motor.
+- `src/reports`: histórico local em arquivo e exportação.
+- `tests`: testes unitários, de integração, regressão e harness CDP nativo.
 
-Aplicacao local para analisar somente a URL fornecida pelo usuario, coletando o DOM renderizado via Chrome DevTools Protocol e avaliando regras proprias baseadas na WCAG 2.2. Nao ha rastreamento automatico de outras paginas.
+O histórico persistente é fornecido a `startLocalServer` pelo entrypoint `src/server/main.ts`; cada captura concluída recebe ID e é gravada em `data/audit-history.json`. Falhas de captura são registradas separadamente. A API `GET /api/history` alimenta a interface após navegação ou recarga.
 
-## Modulos
+## Qualidade e responsividade
 
-- `src/shared`: contratos de transporte entre servidor, motor, interface e comparacoes.
-- `src/server`: HTTP local, validacao anti-SSRF e sessao CDP sem Playwright/Puppeteer.
-- `src/engine`: regras WCAG e classificacao contextual de imagens.
-- `src/ui`: interface escura, responsiva e acessivel baseada nos assets fornecidos.
-- `src/comparisons`: sugestoes fundamentadas em evidencias reais do motor.
-- `tests`: testes unitarios, integracao e paginas-problema.
+`tests/ui-cdp.test.mjs` usa CDP nativo e uma instância isolada do Edge em porta dedicada para abrir a UI real, navegar pelas rotas, medir o documento e validar a interface nos viewports documentados em `README.md`. O teste não pode usar uma sessão CDP que contenha abas do usuário. Se não houver CDP configurado, ele é explicitamente ignorado e não conta como validação de responsividade.
 
-## Dependencias e ordem
-
-`server -> engine -> ui -> comparisons -> reports`. O contrato compartilhado e a fronteira; modulos podem usar fixtures enquanto a dependencia ainda nao esta integrada.
-
-## Isolamento
-
-Cada frente deve trabalhar em branch/worktree proprio e alterar apenas seu escopo. Alteracoes em `src/shared/contracts.ts` exigem revisao do coordenador.
-
-## QA de interface e fixtures
-
-Os testes de qualidade devem permanecer em `tests/` e nao podem corrigir os modulos de producao. `tests/ui-cdp.test.mjs` usa CDP nativo, sem Playwright/Puppeteer, para servir uma fixture de auditoria, abrir a UI real e medir `scrollWidth`/`clientWidth` nos viewports de 320 a 1920 px. O mesmo harness cobre rotas, modal, filtros, copia, historico local, exportacao e assets.
-
-Quando Chromium/CDP nao estiver disponivel, o teste deve ser `skip` explicito; isso nao constitui aprovacao de responsividade. Resultados de overflow, zoom, espacamento e verificacoes manuais devem ser registrados em `docs/quality-review.md`, sem alegar validacoes nao executadas.
+A verificação de 200% e espaçamento de texto é automatizada por simulação CSS; ela não substitui o zoom nativo nem inspeção manual. `docs/quality-review.md` registra os testes executados e as verificações manuais ainda pendentes.

@@ -1,35 +1,18 @@
-# Revisao independente de qualidade
+﻿# Revisão de qualidade
 
-## Escopo
+## Testes automatizados
 
-Esta revisao altera somente `tests/` e `docs/`. Nenhum arquivo de `src/` foi corrigido pelo Agente 5.
+- `npm test`: TypeScript compilado; 44 testes aprovados e 1 teste CDP ignorado quando não há endpoint configurado.
+- `CDP_ENDPOINT=http://127.0.0.1:9223 node --test --test-reporter=spec tests/ui-cdp.test.mjs`: executado com Edge headless isolado; 1 teste aprovado, sem skips.
+- O teste CDP validou as rotas, os nove viewports de 320×568 a 1920×1080, reflow sem rolagem horizontal, URL longa, simulação de escala de 200%, espaçamento de texto, filtros, agrupamento, modal em 320 px, foco de teclado, logo, ícones Regen, imagem e histórico após remoção de localStorage e recarga.
+- Testes de servidor confirmaram IDs de relatórios, sugestões persistidas, API de histórico e separação entre capturas bloqueadas e auditorias válidas.
+- Teste de recuperação confirmou cópia de preservação antes de substituir um histórico incompatível.
+- `git diff --check`: sem erros de whitespace.
 
-## Entregas
+## Verificações manuais pendentes
 
-- Fixtures locais para imagens, contraste, controles e formularios.
-- Vetor anti-SSRF e testes de captura sem auditoria falsa.
-- Testes da UI para landmarks, foco, contraste por tokens, filtros e assets.
-- `tests/ui-cdp.test.mjs`: harness CDP nativo para rotas, viewports 320/375/768/1024/1440/1920, overflow, modal, Escape, copia, storage, exportacao, resolver de imagens e logo.
+Não foram feitos testes manuais com leitores de tela reais, zoom nativo do navegador, dispositivos físicos, modo de alto contraste ou avaliação humana das descrições das imagens. A simulação de escala e espaçamento não comprova os critérios WCAG correspondentes em todos os navegadores. A aplicação não deve ser descrita como totalmente conforme WCAG 2.2 AA até essas verificações serem concluídas.
 
-## Resultado do CDP real
+## Ambiente de teste
 
-Microsoft Edge headless foi iniciado localmente com um perfil temporario e uma porta CDP dedicada. A sessao percorreu as rotas inicial, `#analises` e `#relatorios`. Modal, Escape, filtro de violacoes, copia, historico em `localStorage`, exportacao JSON, origem de imagem, logo e MIME do asset passaram.
-
-Foi encontrado overflow horizontal real em 320 px nas rotas `#analises` e `#relatorios`: `scrollWidth=320`, `clientWidth=305`. O teste falha intencionalmente para impedir que esse defeito seja tratado como aprovado. Nenhuma correcao foi feita em `src/`.
-
-Quando CDP nao esta disponivel, o teste e marcado como `skip`; isso nao e aprovacao. Nao foram realizados testes manuais com leitor de tela, teclado fisico, zoom visual ou inspecao humana de contraste.
-
-## Falhas e riscos conhecidos
-
-1. O build global falha atualmente em `src/server/cdp.ts` por escape octal (`TS1487`), fora do escopo autorizado.
-2. A execucao oficial `npm test` depende do build TypeScript e fica bloqueada enquanto esse erro existir.
-3. O overflow de 320 px precisa ser corrigido pelo agente responsavel pela UI.
-4. A exportacao verificada no CDP e a exportacao JSON do historico; nao foi alegada validacao de um formato adicional.
-5. Nao foram alegadas verificacoes manuais nao executadas.
-
-## Comandos executados
-
-- `node --test` nos testes de UI, fixtures, filtros, seguranca e integracao: 22 passaram.
-- `node --test tests/ui-cdp.test.mjs` sem navegador: 1 skip explicito.
-- `node --test tests/ui-cdp.test.mjs` com Edge headless/CDP: falhou pelo overflow documentado.
-- `npm run build`: falhou em `src/server/cdp.ts` (`TS1487`).
+O navegador de teste foi aberto com perfil temporário próprio e porta CDP 9223; nenhuma aba da sessão CDP externa foi usada na validação final. O teste automático padrão pode registrar um skip para CDP quando não há endpoint dedicado configurado.

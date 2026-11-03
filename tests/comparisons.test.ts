@@ -18,7 +18,7 @@ test('aceita somente evidência estruturada de contraste', () => {
 });
 
 test('não inventa alt para imagem informativa ou finalidade indeterminada', () => {
-  const report = { target: { url: 'https://example.test' }, snapshot: { url: 'https://example.test', title: '', elements: [], capturedAt: '', images: [{ elementId: 'img-1', source: 'image.svg', html: '<img src="image.svg">', purpose: 'informative-or-functional', attributes: {}, evidence: [], relatedCriteria: ['1.1.1'], issues: [], humanReviewRequired: false }, { elementId: 'img-2', source: 'unknown.svg', html: '<img src="unknown.svg">', purpose: 'indeterminate', attributes: {}, evidence: [], relatedCriteria: ['1.1.1'], issues: [], humanReviewRequired: true }] }, results: [], generatedAt: '' } satisfies AuditReport;
+  const report = { target: { url: 'https://example.test' }, snapshot: { url: 'https://example.test', title: '', elements: [], capturedAt: '', images: [{ elementId: 'img-1', source: 'image.svg', html: '<img src="image.svg">', purpose: 'informative', attributes: {}, evidence: [], relatedCriteria: ['1.1.1'], issues: [], humanReviewRequired: false }, { elementId: 'img-2', source: 'unknown.svg', html: '<img src="unknown.svg">', purpose: 'indeterminate', attributes: {}, evidence: [], relatedCriteria: ['1.1.1'], issues: [], humanReviewRequired: true }] }, results: [], generatedAt: '' } satisfies AuditReport;
   const suggestions = generateCorrectionSuggestions(report);
   assert.equal(suggestions.length, 2);
   assert.ok(suggestions.every((item) => item.humanReviewRequired));

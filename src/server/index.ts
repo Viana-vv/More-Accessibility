@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import pathUtil from 'node:path';
@@ -7,8 +8,9 @@ import { auditSnapshot } from '../engine/index.js';
 import { generateCorrectionSuggestions } from '../comparisons/suggestions.js';
 import { captureRenderedPage, CaptureError, type CdpSnapshotOptions } from './cdp.js';
 import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
+import type { AuditHistory } from '../reports/history.js';
 
-export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; staticRoot?: string; logoPath?: string; }
+export interface ServerOptions extends CdpSnapshotOptions { host?: string; port?: number; fixture?: RenderedPageSnapshot | (() => RenderedPageSnapshot | Promise<RenderedPageSnapshot>); maxBodyBytes?: number; staticRoot?: string; logoPath?: string; history?: AuditHistory; }
 export interface RunningServer { server: Server; url: string; close: () => Promise<void>; }
 
 class PreviewError extends Error { constructor(readonly status: number, message: string) { super(message); this.name = 'PreviewError'; } }
@@ -48,6 +50,7 @@ async function body(request: http.IncomingMessage, maxBytes: number): Promise<st
 export function createLocalServer(options: ServerOptions = {}): Server {
   const maxBytes = options.maxBodyBytes ?? 16384;
   return http.createServer(async (request, response) => {
+    let requestedUrl: string | undefined;
     try {
       const path = new URL(request.url ?? '/', 'http://localhost').pathname;
       if (request.method === 'GET' && options.staticRoot && path !== '/health' && !path.startsWith('/api/')) {
@@ -57,13 +60,14 @@ export function createLocalServer(options: ServerOptions = {}): Server {
         if (path !== '/logo.png' && !filePath.startsWith(`${rootPath}${pathUtil.sep}`)) return json(response, 403, { error: 'Recurso bloqueado.' });
         try {
           const content = await readFile(filePath);
-          const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png' };
+          const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml; charset=utf-8' };
           response.writeHead(200, { 'content-type': types[pathUtil.extname(filePath)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
           response.end(content);
           return;
         } catch { return json(response, 404, { error: 'Recurso não encontrado.' }); }
       }
       if (request.method === 'GET' && path === '/health') return json(response, 200, { ok: true });
+      if (request.method === 'GET' && path === '/api/history') return json(response, 200, { persistent: Boolean(options.history), ...(options.history?.snapshot() ?? { validReports: [], failedAudits: [] }), ...(options.history?.loadWarning ? { warning: options.history.loadWarning } : {}) });
       if (request.method === 'GET' && path === '/api/preview') {
         const target = new URL(request.url ?? '/', 'http://localhost').searchParams.get('url');
         if (!target) return json(response, 400, { error: 'O parâmetro url é obrigatório.' });
@@ -74,17 +78,28 @@ export function createLocalServer(options: ServerOptions = {}): Server {
       if (request.method !== 'POST' || path !== '/api/analyze') return json(response, 404, { error: 'Rota não encontrada.' });
       const parsed = JSON.parse(await body(request, maxBytes)) as { url?: unknown };
       if (typeof parsed.url !== 'string') return json(response, 400, { error: 'O campo url é obrigatório.' });
+      requestedUrl = parsed.url;
       const safe = await validateExternalUrl(parsed.url);
       const snapshot = options.fixture ? typeof options.fixture === 'function' ? await options.fixture() : options.fixture : await captureRenderedPage(safe.url.href, options);
-      if (snapshot.captureState !== 'captured' && snapshot.captureState !== undefined) return json(response, 200, { snapshot });
+      if (snapshot.captureState !== 'captured' && snapshot.captureState !== undefined) {
+        options.history?.recordFailure({ id: randomUUID(), occurredAt: new Date().toISOString(), url: safe.url.href, status: snapshot.captureState, message: snapshot.captureMessage || 'A captura não foi concluída.' });
+        return json(response, 200, { snapshot });
+      }
       const report = auditSnapshot(snapshot);
+      report.id = randomUUID();
       report.target.url = safe.url.href;
-      return json(response, 200, { snapshot, report, suggestions: generateCorrectionSuggestions(report) });
+      const suggestions = generateCorrectionSuggestions(report);
+      report.suggestions = suggestions;
+      options.history?.recordValid(report);
+      return json(response, 200, { snapshot, report, suggestions });
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });
       if (error instanceof PreviewError) return json(response, error.status, { error: error.message });
-      if (error instanceof CaptureError) return json(response, 200, { snapshot: error.snapshot ?? { url: '', title: '', elements: [], images: [], capturedAt: new Date().toISOString(), captureState: error.state, captureMessage: error.message } });
+      if (error instanceof CaptureError) {
+        if (requestedUrl) options.history?.recordFailure({ id: randomUUID(), occurredAt: new Date().toISOString(), url: requestedUrl, status: error.state, message: error.message });
+        return json(response, 200, { snapshot: error.snapshot ?? { url: requestedUrl ?? '', title: '', elements: [], images: [], capturedAt: new Date().toISOString(), captureState: error.state, captureMessage: error.message } });
+      }
       return json(response, 502, { error: error instanceof Error ? error.message : 'Falha ao analisar a página.' });
     }
   });
@@ -94,7 +109,7 @@ export async function startLocalServer(options: ServerOptions = {}): Promise<Run
   const server = createLocalServer(options); const host = options.host ?? '127.0.0.1'; const port = options.port ?? 0;
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(port, host, () => { server.removeListener('error', reject); resolve(); }); });
   const address = server.address(); if (!address || typeof address === 'string') throw new Error('Servidor não iniciou.');
-  return { server, url: `http://${host}:${address.port}`, close: () => new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())) };
+  return { server, url: `http://${host}:${address.port}`, close: () => new Promise((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections(); }) };
 }
 
 export { captureRenderedPage } from './cdp.js';

@@ -12,6 +12,9 @@ Também não há ferramenta de subagentes disponível nesta sessão.
 - Vetor de contrato anti-SSRF.
 - Baseline de acessibilidade da própria plataforma.
 - Testes Node nativos, sem biblioteca pronta de auditoria.
+- `tests/fixtures/quality-page.html` e `quality-snapshot.json` para contraste, controles, imagens e formulários.
+- `tests/integration-quality.test.mjs` para servidor + fixture, bloqueio sem relatório falso e serialização de exportação.
+- `tests/ui-quality.test.mjs` para landmarks, nomes, foco, tokens de contraste e SVG decorativo.
 
 ## Defeitos e riscos encontrados
 
@@ -19,6 +22,10 @@ Também não há ferramenta de subagentes disponível nesta sessão.
 2. `PageTarget` contém somente `url`; o contrato não explicita política de esquemas, redirecionamentos, DNS/IP ou timeout, que são requisitos de segurança do servidor.
 3. `RenderedPageSnapshot.images` usa `ImageAnalysis`, mas não há contrato para imagens CSS, evidências de contexto ou origem do recurso além de campos genéricos. O motor precisará preservar essas evidências sem concluir decoração automaticamente.
 4. Não há testes de integração reais, teste de navegador ou página-serviço local porque ainda não existe servidor para exercitar.
+
+5. A integração atual fornece serialização JSON no contrato, mas não há rota/comando de exportação de relatório. O teste cobre apenas a propriedade de exportação local; uma exportação baixável ainda é pendência funcional.
+
+6. A captura falha com HTTP 502 sem retornar relatório, o que evita auditoria falsa. Entretanto, a captura não converte explicitamente timeout, bloqueio e conteúdo indisponível em `captureState` estruturado; esses estados devem ser verificados no CDP e expostos à UI.
 
 ## Próximos critérios de aprovação
 

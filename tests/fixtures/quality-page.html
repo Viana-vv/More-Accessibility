@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <title>Fixture de qualidade WCAG</title>
+    <style>
+      :root { color-scheme: light; }
+      .contrast-fail { color: #777; background: #fff; }
+      .contrast-pass { color: #174a2b; background: #fff; }
+      .focusable:focus-visible { outline: 3px solid #005fcc; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Casos de qualidade</h1>
+      <p class="contrast-fail">Texto com contraste insuficiente.</p>
+      <p class="contrast-pass">Texto com contraste suficiente.</p>
+      <button class="focusable" type="button">Botão nomeado</button>
+      <button class="focusable" type="button"><img src="search.svg" alt=""></button>
+      <a href="/details">Link com propósito</a>
+      <a href="/empty"><span aria-hidden="true">→</span></a>
+      <form>
+        <label for="name">Nome</label><input id="name" name="name" type="text">
+        <input name="unlabelled" type="email">
+        <button type="submit">Enviar</button>
+      </form>
+      <img src="decorative.svg" alt="">
+      <img src="photo.jpg">
+    </main>
+  </body>
+</html>

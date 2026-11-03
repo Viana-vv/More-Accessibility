@@ -15,6 +15,7 @@ test('ocorrências possuem identificador estável, localização e dados de reme
   const first = auditSnapshot(snapshot([input])).results.find((item) => item.ruleId === 'wcag-3.3.2-labels');
   const second = auditSnapshot(snapshot([input])).results.find((item) => item.ruleId === 'wcag-3.3.2-labels');
   assert.equal(first?.occurrenceId, second?.occurrenceId);
+  assert.deepEqual(first?.categoryKey, { criterion: '3.3.2', rule: 'wcag-3.3.2-labels', elementId: 'field-1', kind: 'labels' });
   assert.equal(first?.selector, 'input#email');
   assert.equal(first?.html, input.html);
   assert.equal(first?.impact, 'serious');
@@ -53,11 +54,23 @@ test('marca imagem sem contexto como indeterminada e exige revisão humana', () 
   assert.equal(images[0].humanReviewRequired, true);
 });
 
+test('mantém as quatro finalidades de imagem distintas e não valida a qualidade do alt automaticamente', () => {
+  const images = collectImageAnalyses([
+    element('decorative', 'img', { attributes: { alt: '' } }),
+    element('informative', 'img', { attributes: { alt: 'Descrição fornecida' } }),
+    element('functional', 'img', { attributes: { alt: '' }, parentIds: ['button'] }),
+    element('button', 'button', { accessibleName: 'Abrir menu' }),
+    element('unknown', 'img'),
+  ]);
+  assert.deepEqual(images.map((image) => image.purpose), ['decorative', 'informative', 'functional', 'indeterminate']);
+  assert.equal(images[1].humanReviewRequired, true);
+});
+
 test('não exige alt redundante para ícone de botão nomeado', () => {
   const button = element('button-1', 'button', { accessibleName: 'Pesquisar' });
   const image = element('img-1', 'img', { attributes: { src: '/search.svg', alt: '' }, parentIds: ['button-1'] });
   const images = collectImageAnalyses([button, image]);
-  assert.equal(images[0].purpose, 'informative-or-functional');
+  assert.equal(images[0].purpose, 'functional');
   assert.equal(images[0].humanReviewRequired, false);
 });
 
@@ -76,5 +89,27 @@ test('contraste insuficiente é violação e contraste não observável não é 
   const unknown = element('text-2', 'p', { textContent: 'Texto' });
   const report = auditSnapshot(snapshot([bad, unknown]));
   assert.equal(report.results.find((item) => item.ruleId === 'wcag-1.4.3-contrast' && item.evidence.some((e) => e.source === 'element:text-1'))?.status, 'violation');
-  assert.equal(report.results.filter((item) => item.ruleId === 'wcag-1.4.3-contrast').length, 1);
+  assert.equal(report.results.filter((item) => item.ruleId === 'wcag-1.4.3-contrast').length, 2);
+  assert.equal(report.results.find((item) => item.evidence.some((e) => e.source === 'element:text-2'))?.status, 'review');
+});
+
+test('ignora title e elementos ocultos ao procurar conteúdo renderizado', () => {
+  const report = auditSnapshot(snapshot([
+    element('title-1', 'title', { textContent: 'Falso título' }),
+    element('hidden-1', 'p', { textContent: 'Oculto', computedStyle: { display: 'none', color: '#777777', backgroundColor: '#fff' } }),
+    element('visible-1', 'p', { textContent: 'Visível', computedStyle: { color: '#777777', backgroundColor: '#fff' } }),
+  ]));
+  assert.equal(report.results.some((item) => item.html?.includes('Falso título')), false);
+  assert.equal(report.results.some((item) => item.html?.includes('Oculto')), false);
+  assert.equal(report.results.some((item) => item.html?.includes('Visível')), true);
+});
+
+test('resolve fundo transparente pelo ancestral opaco e revisa composição incerta', () => {
+  const report = auditSnapshot(snapshot([
+    element('panel', 'div', { computedStyle: { backgroundColor: '#ffffff' } }),
+    element('child', 'p', { textContent: 'Texto', parentIds: ['panel'], computedStyle: { color: '#777777', backgroundColor: 'transparent' } }),
+    element('composed', 'p', { textContent: 'Composição', computedStyle: { color: '#000000', backgroundColor: 'rgba(255, 255, 255, 0.5)' } }),
+  ]));
+  assert.equal(report.results.find((item) => item.evidence.some((e) => e.source === 'element:child'))?.status, 'violation');
+  assert.equal(report.results.find((item) => item.evidence.some((e) => e.source === 'element:composed'))?.status, 'review');
 });

@@ -33,5 +33,5 @@ export function makeResult(ruleId: string, criterion: string, description: strin
     occurrenceId: stableId(`${ruleId}|${metadata.occurrenceKey}`), ruleId, criterion, description, level, status, evidence: evidenceList,
     selector: selectorFor(target), impact: metadata.impact, html: target.html, remediation: metadata.remediation, expectedResult: metadata.expectedResult,
     ...(metadata.correctedHtml === undefined ? {} : { correctedHtml: metadata.correctedHtml }),
-  };
+  } as RuleResult & { categoryKey: StructuredCategoryKey; occurrenceId: string };
 }

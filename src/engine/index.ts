@@ -9,9 +9,10 @@ export { rules } from './rules.js';
 export type { ImageCandidate, ImageClassification, RuleContext, WcagRule } from './types.js';
 
 export function auditSnapshot(snapshot: RenderedPageSnapshot, selectedRules: WcagRule[] = rules): AuditReport {
-  const captureState = snapshot.captureState ?? 'captured';
+  const richSnapshot = snapshot as RenderedPageSnapshot & { captureState?: 'captured' | 'authentication-required' | 'blocked' | 'network-error' | 'timeout' | 'content-unavailable'; captureMessage?: string };
+  const captureState = richSnapshot.captureState ?? 'captured';
   const images = snapshot.elements.length ? collectImageAnalyses(snapshot.elements) : snapshot.images;
   const context: RuleContext = { snapshot: { ...snapshot, images }, elements: snapshot.elements, images };
   const results = captureState === 'captured' ? selectedRules.flatMap((rule) => rule.evaluate(context)) : [];
-  return { target: { url: snapshot.url }, snapshot: context.snapshot, results, generatedAt: new Date().toISOString(), captureState, ...(snapshot.captureMessage === undefined ? {} : { captureMessage: snapshot.captureMessage }) };
+  return { target: { url: snapshot.url }, snapshot: context.snapshot, results, generatedAt: new Date().toISOString(), captureState, ...(richSnapshot.captureMessage === undefined ? {} : { captureMessage: richSnapshot.captureMessage }) } as AuditReport & { captureState: typeof captureState; captureMessage?: string };
 }

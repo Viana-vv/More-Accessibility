@@ -14,8 +14,11 @@ function chromeCandidates(): string[] {
     process.env.CHROME_PATH,
     process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'Google/Chrome/Application/chrome.exe') : undefined,
     process.env['PROGRAMFILES(X86)'] ? path.join(process.env['PROGRAMFILES(X86)'], 'Google/Chrome/Application/chrome.exe') : undefined,
+    process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'Google/Chrome/Application/chrome.exe') : undefined,
     process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Google/Chrome/Application/chrome.exe') : undefined,
     process.env.PROGRAMFILES ? path.join(process.env.PROGRAMFILES, 'Microsoft/Edge/Application/msedge.exe') : undefined,
+    process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'Microsoft/Edge/Application/msedge.exe') : undefined,
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   ].filter((value): value is string => Boolean(value));
 }
 

@@ -9,7 +9,7 @@ export { rules } from './rules.js';
 export type { ImageCandidate, ImageClassification, RuleContext, WcagRule } from './types.js';
 
 export function auditSnapshot(snapshot: RenderedPageSnapshot, selectedRules: WcagRule[] = rules): AuditReport {
-  const images = snapshot.images.length ? snapshot.images : collectImageAnalyses(snapshot.elements);
+  const images = snapshot.elements.length ? collectImageAnalyses(snapshot.elements) : snapshot.images;
   const context: RuleContext = { snapshot: { ...snapshot, images }, elements: snapshot.elements, images };
   return { target: { url: snapshot.url }, snapshot: context.snapshot, results: selectedRules.flatMap((rule) => rule.evaluate(context)), generatedAt: new Date().toISOString() };
 }

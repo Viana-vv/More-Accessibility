@@ -59,7 +59,15 @@ export function collectImageAnalyses(elements: RenderedElement[]): ImageAnalysis
 }
 
 function ancestors(element: RenderedElement, elements: RenderedElement[]): RenderedElement[] {
-  return element.parentIds.map((id) => elements.find((candidate) => candidate.id === id)).filter((candidate): candidate is RenderedElement => candidate !== undefined);
+  const found: RenderedElement[] = [];
+  let current = element;
+  const seen = new Set<string>();
+  while (current.parentIds.length) {
+    const parent = elements.find((candidate) => candidate.id === current.parentIds[0]);
+    if (!parent || seen.has(parent.id)) break;
+    found.push(parent); seen.add(parent.id); current = parent;
+  }
+  return found;
 }
 function nearbyText(element: RenderedElement, elements: RenderedElement[]): string {
   return ancestors(element, elements).map((parent) => normalized(parent.textContent)).find(Boolean) ?? '';

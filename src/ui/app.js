@@ -5,6 +5,7 @@
   const status = document.querySelector('#form-status');
   const resultUrl = document.querySelector('#result-url');
   const resultStatus = document.querySelector('#result-status');
+  const captureContext = document.querySelector('#capture-context');
   const ruleResults = document.querySelector('#rule-results');
   const imageResults = document.querySelector('#image-results');
 
@@ -24,9 +25,12 @@
     const images = report?.snapshot?.images ?? [];
     const counts = results.reduce((acc, item) => { acc[item.status] = (acc[item.status] || 0) + 1; return acc; }, {});
     resultUrl.textContent = text(report?.target?.url);
-    resultStatus.textContent = 'Análise concluída';
+    const title = report?.snapshot?.title || 'Título não informado';
+    const accessDenied = /access denied|acesso negado|forbidden|não autorizado/i.test(title);
+    resultStatus.textContent = accessDenied ? 'Revisão necessária' : 'Análise concluída';
+    if (captureContext) captureContext.textContent = accessDenied ? `Captura recebida: “${title}”. O conteúdo original não foi disponibilizado.` : `Documento capturado: “${title}”.`;
     document.querySelector('#audit-summary').textContent = `${counts.violation || 0} violação(ões), ${counts.review || 0} revisão(ões), ${counts.pass || 0} aprovação(ões) e ${counts['not-applicable'] || 0} não aplicável(is).`;
-    document.querySelector('#image-summary').textContent = `${images.length} imagem(ns) encontrada(s); ${images.filter(item => item.humanReviewRequired).length} exige(m) revisão humana.`;
+    document.querySelector('#image-summary').textContent = accessDenied ? 'A página original não foi entregue; não é possível concluir a análise de imagens.' : `${images.length} imagem(ns) encontrada(s); ${images.filter(item => item.humanReviewRequired).length} exige(m) revisão humana.`;
     ruleResults.replaceChildren(...(results.length ? results.map((item) => { const row = document.createElement('p'); row.textContent = `${item.criterion} — ${item.description}: ${statusLabel(item.status)}.`; return row; }) : [document.createTextNode('Nenhuma regra foi aplicada ao snapshot.') ]));
     imageResults.replaceChildren(...(images.length ? images.map((item) => { const row = document.createElement('p'); row.textContent = `${item.elementId} — ${item.purpose === 'decorative' ? 'Decorativa' : item.purpose === 'informative-or-functional' ? 'Informativa ou funcional' : 'Indeterminada'}${item.humanReviewRequired ? ' — revisão humana necessária' : ''}.`; return row; }) : [document.createTextNode('Nenhuma imagem foi encontrada.') ]));
   }

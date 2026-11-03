@@ -32,7 +32,20 @@
     views.forEach((view) => { view.hidden = view.id !== viewId; });
   }
 
-  function route() { const hash = window.location.hash.slice(1); showView(hash === 'analises' ? 'analyses' : hash === 'relatorios' ? 'reports' : 'home'); }
+  function route() { const hash = window.location.hash.slice(1); showView(hash === 'analises' ? 'analyses' : hash === 'relatorios' ? 'reports' : 'home'); if (hash === 'relatorios') renderHistory(); }
+
+  function historyState() { try { return JSON.parse(localStorage.getItem('wcag-audit-history') || '{"validReports":[],"failedAudits":[]}'); } catch { return { validReports: [], failedAudits: [] }; } }
+  function saveHistory(state) { localStorage.setItem('wcag-audit-history', JSON.stringify(state)); }
+  function download(name, content, type) { const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([content], { type })); link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); }
+  function renderHistory() {
+    const section = document.querySelector('#relatorios'); if (!section) return;
+    let list = section.querySelector('#history-list'); if (!list) { list = make('div', 'history-list'); list.id = 'history-list'; section.append(list); }
+    let actions = section.querySelector('#history-actions'); if (!actions) { actions = make('div', 'report-actions'); actions.id = 'history-actions'; const json = make('button', 'secondary-button', 'Exportar histórico JSON'); json.type = 'button'; json.addEventListener('click', () => download('historico-wcag.json', JSON.stringify(historyState(), null, 2), 'application/json')); const html = make('button', 'secondary-button', 'Exportar histórico HTML'); html.type = 'button'; html.addEventListener('click', () => { const state = historyState(); const content = `<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>Histórico de análises</title><main><h1>Histórico de análises</h1>${[...(state.validReports || []).map((item) => `<article><h2>${escape(item.target.url)}</h2><p>${escape(item.generatedAt)}</p></article>`), ...(state.failedAudits || []).map((item) => `<article><h2>Falha</h2><p>${escape(item.message)}</p></article>`)].join('')}</main></html>`; download('historico-wcag.html', content, 'text/html'); }); actions.append(json, html); section.insertBefore(actions, list); }
+    const state = historyState(); list.replaceChildren(); const reports = state.validReports || []; const failures = state.failedAudits || [];
+    if (!reports.length && !failures.length) { list.append(make('p', 'empty-result', 'Nenhum relatório ou falha registrada.')); return; }
+    reports.forEach((report) => { const item = make('article', 'result-card'); item.append(make('div', '', `${report.target.url} — ${report.generatedAt}`)); const button = make('button', 'secondary-button', 'Abrir análise'); button.type = 'button'; button.addEventListener('click', () => { renderReport(report); window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden'); }); item.append(button); list.append(item); });
+    failures.forEach((failure) => { const item = make('article', 'result-card'); item.append(make('div', '', `Falha — ${failure.target?.url || 'URL não informada'} — ${failure.message}`)); list.append(item); });
+  }
 
   function codeBlock(label, value, language = 'html') {
     const wrapper = make('div', 'code-block');
@@ -144,7 +157,8 @@
       const response = await fetch('/api/analyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }) });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Não foi possível analisar a URL.');
-      renderReport(payload.report); status.textContent = 'Análise concluída. Os resultados estão disponíveis na aba Análises.'; window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden');
+      const report = payload.report || { target: { url }, snapshot: payload.snapshot, results: [], generatedAt: new Date().toISOString(), captureState: payload.snapshot?.captureState || 'content-unavailable', captureMessage: payload.snapshot?.captureMessage };
+      renderReport(report); const state = historyState(); if (report.captureState === 'captured') state.validReports = [report, ...(state.validReports || [])]; else state.failedAudits = [{ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), target: { url }, message: report.captureMessage || 'A captura não foi concluída.' }, ...(state.failedAudits || [])]; saveHistory(state); status.textContent = 'Análise concluída. Os resultados estão disponíveis na aba Análises.'; window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden');
     } catch (error) { status.textContent = error instanceof Error ? error.message : 'Falha na análise.'; }
   });
   route();

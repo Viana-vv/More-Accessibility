@@ -27,7 +27,7 @@ export interface ImageAnalysis {
 }
 
 export interface RuleResult {
-  occurrenceId: string;
+  occurrenceId?: string;
   ruleId: string;
   criterion: string;
   description: string;
@@ -69,7 +69,7 @@ export interface AuditReport {
   snapshot: RenderedPageSnapshot;
   results: RuleResult[];
   generatedAt: string;
-  captureState: CaptureState;
+  captureState?: CaptureState;
   captureMessage?: string;
 }
 

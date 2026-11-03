@@ -42,7 +42,7 @@ class CdpClient {
     let message: CdpMessage; try { message = JSON.parse(raw) as CdpMessage; } catch { return; }
     if (message.id !== undefined) {
       const item = this.pending.get(message.id); if (!item) return; clearTimeout(item.timer); this.pending.delete(message.id);
-      if (message.error) item.reject(new Error(message.error.message)); else item.resolve(message.result ?? {}); return;
+      if (message.error) item.reject(new Error(`Comando CDP recusado: ${message.error.message}`)); else item.resolve(message.result ?? {}); return;
     }
     if (message.method && message.params) for (const handler of this.handlers.get(message.method) ?? []) void handler(message.params);
   }
@@ -63,11 +63,12 @@ const SNAPSHOT_SCRIPT = `(() => {
 export interface CdpSnapshotOptions { chromeEndpoint?: string; timeoutMs?: number; }
 
 async function chromeWebSocketUrl(endpoint: string, timeoutMs: number): Promise<string> {
-  const response = await fetch(new URL('/json/version', endpoint), { signal: AbortSignal.timeout(timeoutMs) });
-  if (!response.ok) throw new Error(`Chrome respondeu ${response.status} ao consultar /json/version.`);
-  const data = await response.json() as { webSocketDebuggerUrl?: string };
-  if (!data.webSocketDebuggerUrl) throw new Error('Chrome não informou webSocketDebuggerUrl.');
-  return data.webSocketDebuggerUrl;
+  const response = await fetch(new URL('/json/list', endpoint), { signal: AbortSignal.timeout(timeoutMs) });
+  if (!response.ok) throw new Error(`O navegador respondeu ${response.status} ao consultar as abas CDP.`);
+  const pages = await response.json() as Array<{ type?: string; webSocketDebuggerUrl?: string }>;
+  const page = pages.find(item => item.type === 'page' && item.webSocketDebuggerUrl);
+  if (!page?.webSocketDebuggerUrl) throw new Error('O navegador não informou uma aba disponível para análise.');
+  return page.webSocketDebuggerUrl;
 }
 
 export async function captureRenderedPage(inputUrl: string, options: CdpSnapshotOptions = {}): Promise<RenderedPageSnapshot> {

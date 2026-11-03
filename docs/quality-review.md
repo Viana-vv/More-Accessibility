@@ -1,38 +1,35 @@
-# Revisão independente — Agente 5
+# Revisao independente de qualidade
 
-## Estado
+## Escopo
 
-Em 03/11/2026, o repositório contém apenas `src/shared/contracts.ts`, documentação e assets visuais. Os diretórios de servidor CDP, motor WCAG, UI e comparações ainda não estão presentes. Não foi possível criar a branch/worktree `quality/testing` porque o Git recusou a criação de refs no `.git`; a tentativa de `quality-testing` também falhou por permissão. Não foram alterados arquivos desses módulos.
-
-Também não há ferramenta de subagentes disponível nesta sessão.
+Esta revisao altera somente `tests/` e `docs/`. Nenhum arquivo de `src/` foi corrigido pelo Agente 5.
 
 ## Entregas
 
-- Fixtures locais para os dez casos de imagens obrigatórios.
-- Vetor de contrato anti-SSRF.
-- Baseline de acessibilidade da própria plataforma.
-- Testes Node nativos, sem biblioteca pronta de auditoria.
-- `tests/fixtures/quality-page.html` e `quality-snapshot.json` para contraste, controles, imagens e formulários.
-- `tests/integration-quality.test.mjs` para servidor + fixture, bloqueio sem relatório falso e serialização de exportação.
-- `tests/ui-quality.test.mjs` para landmarks, nomes, foco, tokens de contraste e SVG decorativo.
+- Fixtures locais para imagens, contraste, controles e formularios.
+- Vetor anti-SSRF e testes de captura sem auditoria falsa.
+- Testes da UI para landmarks, foco, contraste por tokens, filtros e assets.
+- `tests/ui-cdp.test.mjs`: harness CDP nativo para rotas, viewports 320/375/768/1024/1440/1920, overflow, modal, Escape, copia, storage, exportacao, resolver de imagens e logo.
 
-## Defeitos e riscos encontrados
+## Resultado do CDP real
 
-1. Não há implementação para executar auditorias ou validar URL/CDP; os testes de integração contra esses módulos ainda não podem ser conectados.
-2. `PageTarget` contém somente `url`; o contrato não explicita política de esquemas, redirecionamentos, DNS/IP ou timeout, que são requisitos de segurança do servidor.
-3. `RenderedPageSnapshot.images` usa `ImageAnalysis`, mas não há contrato para imagens CSS, evidências de contexto ou origem do recurso além de campos genéricos. O motor precisará preservar essas evidências sem concluir decoração automaticamente.
-4. Não há testes de integração reais, teste de navegador ou página-serviço local porque ainda não existe servidor para exercitar.
+Microsoft Edge headless foi iniciado localmente com um perfil temporario e uma porta CDP dedicada. A sessao percorreu as rotas inicial, `#analises` e `#relatorios`. Modal, Escape, filtro de violacoes, copia, historico em `localStorage`, exportacao JSON, origem de imagem, logo e MIME do asset passaram.
 
-5. A integração atual fornece serialização JSON no contrato, mas não há rota/comando de exportação de relatório. O teste cobre apenas a propriedade de exportação local; uma exportação baixável ainda é pendência funcional.
+Foi encontrado overflow horizontal real em 320 px nas rotas `#analises` e `#relatorios`: `scrollWidth=320`, `clientWidth=305`. O teste falha intencionalmente para impedir que esse defeito seja tratado como aprovado. Nenhuma correcao foi feita em `src/`.
 
-6. A captura falha com HTTP 502 sem retornar relatório, o que evita auditoria falsa. Entretanto, a captura não converte explicitamente timeout, bloqueio e conteúdo indisponível em `captureState` estruturado; esses estados devem ser verificados no CDP e expostos à UI.
+Quando CDP nao esta disponivel, o teste e marcado como `skip`; isso nao e aprovacao. Nao foram realizados testes manuais com leitor de tela, teclado fisico, zoom visual ou inspecao humana de contraste.
 
-## Próximos critérios de aprovação
+## Falhas e riscos conhecidos
 
-Quando os módulos forem integrados, o Agente 5 deve substituir/estender os testes de fixture para chamar o servidor e motor reais, verificar bloqueio de redirecionamentos e DNS rebinding, validar timeout/encerramento CDP, conferir os dez resultados por `elementId`, e executar uma auditoria manual de teclado e contraste da UI.
+1. O build global falha atualmente em `src/server/cdp.ts` por escape octal (`TS1487`), fora do escopo autorizado.
+2. A execucao oficial `npm test` depende do build TypeScript e fica bloqueada enquanto esse erro existir.
+3. O overflow de 320 px precisa ser corrigido pelo agente responsavel pela UI.
+4. A exportacao verificada no CDP e a exportacao JSON do historico; nao foi alegada validacao de um formato adicional.
+5. Nao foram alegadas verificacoes manuais nao executadas.
 
-## Atualização da revisão integrada
+## Comandos executados
 
-Os módulos agora estão presentes e os testes de integração com fixture passam. A execução oficial permanece bloqueada por erros de build TypeScript: `src/engine/rules.ts` foi removido no worktree atual; `ImageCandidate` não declara `isCssBackground`; `auditSnapshot` não fornece `captureState`; e fixtures TypeScript existentes não fornecem `captureState`/`occurrenceId`.
-
-A exportação coberta nesta entrega é serialização JSON local; não há ainda rota ou comando de download de relatório. A captura que falha retorna HTTP 502 sem relatório, evitando auditoria falsa, mas os estados estruturados de timeout, bloqueio e conteúdo indisponível ainda devem ser verificados no CDP e expostos à UI.
+- `node --test` nos testes de UI, fixtures, filtros, seguranca e integracao: 22 passaram.
+- `node --test tests/ui-cdp.test.mjs` sem navegador: 1 skip explicito.
+- `node --test tests/ui-cdp.test.mjs` com Edge headless/CDP: falhou pelo overflow documentado.
+- `npm run build`: falhou em `src/server/cdp.ts` (`TS1487`).

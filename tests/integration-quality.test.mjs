@@ -13,6 +13,7 @@ async function modules() {
       server: await import('../dist/src/server/index.js'),
       engine: await import('../dist/src/engine/index.js'),
       comparisons: await import('../dist/src/comparisons/index.js'),
+      history: await import('../dist/src/reports/history.js'),
     };
   } catch (error) {
     return { unavailable: error instanceof Error ? error.message : String(error) };
@@ -22,7 +23,8 @@ async function modules() {
 test('integra servidor local, fixture real e motor sem inventar captura', async (context) => {
   const loaded = await modules();
   if (loaded.unavailable) return context.skip(`build/API indisponível: ${loaded.unavailable}`);
-  const running = await loaded.server.startLocalServer({ fixture: snapshot });
+  const history = new loaded.history.AuditHistory(new loaded.history.MemoryStorage());
+  const running = await loaded.server.startLocalServer({ fixture: snapshot, history });
   try {
     const response = await fetch(`${running.url}/api/analyze`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://example.com/quality-page.html' }) });
     assert.equal(response.status, 200);
@@ -31,6 +33,27 @@ test('integra servidor local, fixture real e motor sem inventar captura', async 
     assert.equal(payload.report.target.url, 'https://example.com/quality-page.html');
     assert.equal(payload.report.snapshot.url, snapshot.url);
     assert.ok(Array.isArray(payload.report.results));
+    assert.ok(payload.report.id);
+    assert.ok(Array.isArray(payload.report.suggestions));
+    const saved = await (await fetch(`${running.url}/api/history`)).json();
+    assert.equal(saved.persistent, true);
+    assert.equal(saved.validReports[0].id, payload.report.id);
+  } finally { await running.close(); }
+});
+
+test('captura bloqueada aparece no histórico de falhas, sem ser relatório válido', async (context) => {
+  const loaded = await modules();
+  if (loaded.unavailable) return context.skip(`build/API indisponível: ${loaded.unavailable}`);
+  const history = new loaded.history.AuditHistory(new loaded.history.MemoryStorage());
+  const running = await loaded.server.startLocalServer({ history, fixture: { ...snapshot, captureState: 'blocked', captureMessage: 'Acesso negado.' } });
+  try {
+    const response = await fetch(`${running.url}/api/analyze`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: 'https://example.com/blocked' }) });
+    const payload = await response.json();
+    const saved = await (await fetch(`${running.url}/api/history`)).json();
+    assert.equal(payload.report, undefined);
+    assert.equal(saved.validReports.length, 0);
+    assert.equal(saved.failedAudits.length, 1);
+    assert.equal(saved.failedAudits[0].status, 'blocked');
   } finally { await running.close(); }
 });
 

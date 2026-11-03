@@ -1,11 +1,21 @@
-export const CATEGORIES = Object.freeze({
-  contrast: 'Textos e contraste',
-  images: 'Imagens',
-  controls: 'Botões e controles',
-  links: 'Links',
-  forms: 'Formulários',
-  structure: 'Estrutura e navegação',
-  other: 'Outros problemas',
+﻿export const CATEGORIES = Object.freeze({
+  contrast: 'text-contrast',
+  images: 'images',
+  controls: 'controls',
+  links: 'links',
+  forms: 'forms',
+  structure: 'structure-navigation',
+  other: 'other',
+});
+
+export const CATEGORY_LABELS = Object.freeze({
+  [CATEGORIES.contrast]: 'Textos e contraste',
+  [CATEGORIES.images]: 'Imagens',
+  [CATEGORIES.controls]: 'Botões e controles',
+  [CATEGORIES.links]: 'Links',
+  [CATEGORIES.forms]: 'Formulários',
+  [CATEGORIES.structure]: 'Estrutura e navegação',
+  [CATEGORIES.other]: 'Outros',
 });
 
 export function categoryFor(result) {

@@ -38,6 +38,8 @@ test('UI declara foco visível, contraste por tokens e layout responsivo', () =>
 test('ícones SVG decorativos não entram na árvore acessível', () => {
   const svgCount = (html.match(/<svg\b/g) ?? []).length;
   const hiddenCount = (html.match(/<svg[^>]+aria-hidden="true"/g) ?? []).length;
-  assert.ok(svgCount > 0);
+  const decorativeImages = [...html.matchAll(/<img[^>]+src="\/icons\/[^\"]+"[^>]*>/g)].map(([tag]) => tag);
   assert.equal(hiddenCount, svgCount);
+  assert.ok(decorativeImages.length > 0);
+  assert.ok(decorativeImages.every((tag) => /alt=""/.test(tag) && /aria-hidden="true"/.test(tag)));
 });

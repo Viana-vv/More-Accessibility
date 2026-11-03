@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { startLocalServer } from './index.js';
+import { createFileAuditHistory } from '../reports/history.js';
 
 async function chromeIsReady(): Promise<boolean> {
   try { const response = await fetch('http://127.0.0.1:9222/json/version', { signal: AbortSignal.timeout(500) }); return response.ok; } catch { return false; }
@@ -34,7 +35,8 @@ async function ensureChrome(): Promise<ChildProcess | undefined> {
 }
 
 const chrome = await ensureChrome();
-const running = await startLocalServer({ port: Number(process.env.PORT ?? 8787), staticRoot: 'src/ui', logoPath: 'Logo de olho estilizado em janela roxa.png' });
+const history = createFileAuditHistory();
+const running = await startLocalServer({ port: Number(process.env.PORT ?? 8787), staticRoot: 'src/ui', logoPath: 'Logo de olho estilizado em janela roxa.png', history });
 console.log(`Servidor local em ${running.url}`);
 
 const shutdown = async () => {

@@ -39,3 +39,20 @@ test('interface prevê detalhe por ocorrência, comparação e cópia', async ()
   assert.match(app, /Escape/);
   assert.match(app, /currentResults = results\.filter/);
 });
+
+test('refinamento visual remove a faixa estrutural e mantém a home editorial', async () => {
+  const overrides = await readFile(resolve(root, 'src/ui/analysis-overrides.css'), 'utf8');
+  assert.doesNotMatch(html, /class="feature-grid"/);
+  assert.match(html, /Logo%20de%20olho%20estilizado%20em%20janela%20roxa\.png/);
+  assert.match(overrides, /overflow-x: hidden/);
+  assert.match(overrides, /background: var\(--bg\)/);
+  assert.match(overrides, /min-height: calc\(100svh - 72px\)/);
+});
+
+test('estados compactos têm wrapping e foco de modal responsivo', async () => {
+  const overrides = await readFile(resolve(root, 'src/ui/analysis-overrides.css'), 'utf8');
+  assert.match(overrides, /overflow-wrap: anywhere/);
+  assert.match(overrides, /dialog::backdrop/);
+  assert.match(overrides, /dialog:focus-visible/);
+  assert.match(overrides, /@media \(max-width: 760px\)/);
+});

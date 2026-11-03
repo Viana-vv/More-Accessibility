@@ -1,0 +1,9 @@
+[
+  {"url":"http://127.0.0.1:8080","allowed":false,"reason":"loopback IPv4"},
+  {"url":"http://localhost/","allowed":false,"reason":"localhost"},
+  {"url":"http://[::1]/","allowed":false,"reason":"loopback IPv6"},
+  {"url":"http://169.254.169.254/latest/meta-data/","allowed":false,"reason":"cloud metadata"},
+  {"url":"file:///C:/Windows/win.ini","allowed":false,"reason":"local file"},
+  {"url":"ftp://example.com/resource","allowed":false,"reason":"unsupported scheme"},
+  {"url":"https://example.com/","allowed":true,"reason":"public HTTPS target"}
+]

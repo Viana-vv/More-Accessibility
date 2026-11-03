@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head><meta charset="utf-8"><title>Fixture de imagens</title>
+    <style>
+      .decorative-bg { background-image: url('/fixtures/decorative-bg.svg'); width: 24px; height: 24px; }
+      .informative-bg { background-image: url('/fixtures/chart-with-data.svg'); width: 320px; height: 160px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Casos de imagens</h1>
+      <section id="case-01"><h2>Decorativa marcada vazia</h2><img id="image-01" src="decorative.svg" alt=""></section>
+      <section id="case-02"><h2>Decorativa com descrição redundante</h2><img id="image-02" src="rule.svg" alt="linha decorativa"></section>
+      <section id="case-03"><h2>Informativa sem alternativa</h2><img id="image-03" src="chart.svg"></section>
+      <section id="case-04"><h2>Informativa com alternativa possivelmente inadequada</h2><img id="image-04" src="chart.svg" alt="imagem"></section>
+      <section id="case-05"><h2>Ícone de botão com nome</h2><button id="control-05" aria-label="Pesquisar"><img id="image-05" src="search.svg" alt=""></button></section>
+      <section id="case-06"><h2>Ícone de botão sem nome</h2><button id="control-06"><img id="image-06" src="search.svg" alt=""></button></section>
+      <section id="case-07"><h2>Imagem de link com nome</h2><a id="control-07" href="/inicio"><img id="image-07" src="home.svg" alt="Página inicial"></a></section>
+      <section id="case-08"><h2>Fundo decorativo</h2><div id="image-08" class="decorative-bg" aria-hidden="true"></div></section>
+      <section id="case-09"><h2>Fundo com informação</h2><div id="image-09" class="informative-bg"></div></section>
+      <section id="case-10"><h2>Finalidade indeterminada</h2><img id="image-10" src="unknown.svg"></section>
+    </main>
+  </body>
+</html>

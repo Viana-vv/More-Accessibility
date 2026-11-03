@@ -4,7 +4,7 @@
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test tests/**/*.test.mjs",
-    "dev": "node --enable-source-maps dist/src/server/main.js"
+    "dev": "npm run build && node --enable-source-maps dist/src/server/main.js"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

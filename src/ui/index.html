@@ -7,6 +7,7 @@
     <title>Análise de acessibilidade WCAG 2.2</title>
     <link rel="stylesheet" href="./styles.css" />
     <link rel="stylesheet" href="./results.css" />
+    <link rel="stylesheet" href="./analysis-overrides.css" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">Pular para o conteúdo principal</a>
@@ -23,7 +24,6 @@
         <div class="hero-copy"><h1 id="page-title">Analise a acessibilidade do seu site</h1><p class="hero-description">Verifique a conformidade com a WCAG 2.2, identifique problemas e receba orientações de melhoria.</p></div>
         <form class="scan-form" id="scan-form"><label class="sr-only" for="target-url">URL do site para analisar</label><div class="url-field"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1" /></svg><input id="target-url" name="url" type="url" inputmode="url" placeholder="Cole a URL do site (ex.: https://exemplo.com)" autocomplete="url" required /></div><button class="primary-button" type="submit"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z" /></svg><span>Iniciar análise</span></button></form>
         <p class="form-status" id="form-status" role="status" aria-live="polite"></p>
-        <div class="feature-grid" aria-label="Recursos da análise"><article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6l-8-3Z" /><path d="m8 12 2.5 2.5L16 9" /></svg><h2>Conformidade<br />WCAG 2.2</h2></article><article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></svg><h2>Sugestões de<br />correção</h2></article><article class="feature-card"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m8 9-4 3 4 3M16 9l4 3-4 3M14 5l-4 14" /></svg><h2>Exemplos de<br />implementação</h2></article></div>
       </section>
       <section id="analises" class="view panel-view" aria-labelledby="analyses-title" hidden>
         <div class="section-heading"><h1 id="analyses-title">Análises</h1><p>Veja os resultados produzidos pelo motor, com evidências, impacto, correções e indicação de revisão humana.</p></div>
@@ -32,13 +32,14 @@
           <div class="results-summary"><div><span class="summary-label">URL analisada</span><strong id="result-url">—</strong><span id="capture-context" class="summary-note">—</span></div><span class="status-chip" id="result-status">Análise concluída</span></div>
           <div id="capture-alert" class="capture-alert" role="alert" hidden></div>
           <div class="result-grid"><article class="result-card"><span class="result-icon" aria-hidden="true">◌</span><div><h2>Resumo da auditoria</h2><p id="audit-summary">—</p></div></article><article class="result-card"><span class="result-icon" aria-hidden="true">◉</span><div><h2>Imagens encontradas</h2><p id="image-summary">—</p></div></article></div>
-          <section class="report-section" aria-labelledby="criteria-heading"><div class="section-title-row"><div><p class="eyebrow">Evidências do relatório</p><h2 id="criteria-heading">Resultados por critério</h2></div><span class="section-count" id="criteria-count">0 ocorrências</span></div><div id="rule-results" class="accordion-list" aria-live="polite"></div></section>
+          <section class="report-section" aria-labelledby="criteria-heading"><div class="section-title-row"><div><p class="eyebrow">Evidências do relatório</p><h2 id="criteria-heading">Resultados por critério</h2></div><span class="section-count" id="criteria-count">0 ocorrências</span></div><div id="result-filters" class="result-filters" role="group" aria-label="Filtrar resultados"><button type="button" class="filter-button is-active" data-filter="all">Todos</button><button type="button" class="filter-button" data-filter="violation">Violações</button><button type="button" class="filter-button" data-filter="review">Revisão humana</button></div><div id="category-list" class="category-list"></div><div id="rule-results" class="accordion-list" aria-live="polite"></div></section>
           <section class="report-section" aria-labelledby="images-heading"><div class="section-title-row"><div><p class="eyebrow">Conteúdo não textual</p><h2 id="images-heading">Classificação contextual de imagens</h2></div><span class="section-count" id="images-count">0 imagens</span></div><div id="image-results" class="image-list" aria-live="polite"></div></section>
         </div>
       </section>
       <section id="relatorios" class="view panel-view" aria-labelledby="reports-title" hidden><div class="section-heading"><h1 id="reports-title">Relatórios</h1><p>Consulte relatórios gerados localmente e acompanhe a evolução das correções.</p></div><div class="empty-state"><div class="empty-icon" aria-hidden="true">≡</div><h2>Nenhum relatório salvo</h2><p>Depois de uma análise, os relatórios poderão ser consultados nesta área.</p><a class="secondary-button" href="#inicio">Iniciar uma análise</a></div></section>
     </main>
     <template id="rule-template"><details class="criterion-item"><summary><span class="criterion-title"></span><span class="status-chip criterion-status"></span></summary><div class="criterion-body"></div></details></template>
+    <div id="detail-modal" class="detail-modal" hidden><div class="modal-backdrop" data-close-modal></div><section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1"><button type="button" class="modal-close" id="modal-close" aria-label="Fechar detalhes">×</button><h2 id="modal-title">Detalhes da ocorrência</h2><div id="modal-content"></div></section></div>
     <script src="./app.js" defer></script>
   </body>
 </html>

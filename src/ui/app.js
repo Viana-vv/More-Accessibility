@@ -9,6 +9,16 @@
   const captureAlert = document.querySelector('#capture-alert');
   const ruleResults = document.querySelector('#rule-results');
   const imageResults = document.querySelector('#image-results');
+  const categoryList = document.querySelector('#category-list');
+  const modal = document.querySelector('#detail-modal');
+  const modalContent = document.querySelector('#modal-content');
+  const modalTitle = document.querySelector('#modal-title');
+  const modalPanel = document.querySelector('.modal-panel');
+  let currentResults = [];
+  let activeFilter = 'all';
+  let lastFocusedElement;
+  let lastReport;
+  let currentSuggestions = [];
 
   const captureLabels = {
     captured: 'Captura concluída',
@@ -32,7 +42,7 @@
     views.forEach((view) => { view.hidden = view.id !== viewId; });
   }
 
-  function route() { const hash = window.location.hash.slice(1); showView(hash === 'analises' ? 'analyses' : hash === 'relatorios' ? 'reports' : 'home'); if (hash === 'relatorios') renderHistory(); }
+  function route() { const hash = window.location.hash.slice(1); showView(hash === 'analises' ? 'analyses' : hash === 'relatorios' ? 'reports' : 'home'); if (hash === 'relatorios') renderHistory(); if (hash === 'analises' && !lastReport) { const saved = historyState().validReports?.[0]; if (saved) { lastReport = saved; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden'); renderReport(saved); } } }
 
   function historyState() { try { return JSON.parse(localStorage.getItem('wcag-audit-history') || '{"validReports":[],"failedAudits":[]}'); } catch { return { validReports: [], failedAudits: [] }; } }
   function saveHistory(state) { localStorage.setItem('wcag-audit-history', JSON.stringify(state)); }
@@ -46,6 +56,28 @@
     reports.forEach((report) => { const item = make('article', 'result-card'); item.append(make('div', '', `${report.target.url} — ${report.generatedAt}`)); const button = make('button', 'secondary-button', 'Abrir análise'); button.type = 'button'; button.addEventListener('click', () => { renderReport(report); window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden'); }); item.append(button); list.append(item); });
     failures.forEach((failure) => { const item = make('article', 'result-card'); item.append(make('div', '', `Falha — ${failure.target?.url || 'URL não informada'} — ${failure.message}`)); list.append(item); });
   }
+
+  function categoryFor(item) {
+    const criterion = String(item.criterion || '');
+    if (criterion === '1.4.3' || criterion === '1.4.6') return 'Textos e contraste';
+    if (criterion === '4.1.2' || criterion === '2.5.8') return 'Botões e controles';
+    if (criterion === '2.4.4') return 'Links';
+    if (criterion === '1.1.1') return 'Imagens';
+    if (criterion === '3.3.2') return 'Formulários';
+    if (criterion === '1.3.1') return 'Estrutura semântica';
+    if (criterion === '2.4.7' || criterion === '2.4.11') return 'Navegação e teclado';
+    return 'Outros problemas';
+  }
+
+  function filteredResults() { return currentResults.filter((item) => (item.status === 'violation' || item.status === 'review') && (activeFilter === 'all' || item.status === activeFilter)); }
+  function drawCategories() {
+    const counts = new Map(); currentResults.forEach((item) => { const category = categoryFor(item); const count = counts.get(category) || { violation: 0, review: 0 }; if (item.status === 'violation') count.violation += 1; if (item.status === 'review') count.review += 1; counts.set(category, count); });
+    categoryList.replaceChildren(...[...counts.entries()].map(([name, count]) => { const button = make('button', 'category-button', `${name} — ${count.violation} violação(ões), ${count.review} revisão(ões)`); button.type = 'button'; button.addEventListener('click', () => { activeFilter = 'category:' + name; drawResults(); }); return button; }));
+  }
+  function drawResults() { const results = filteredResults().filter((item) => !activeFilter.startsWith('category:') || categoryFor(item) === activeFilter.slice(9)); document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`; ruleResults.replaceChildren(...(results.length ? results.map((item) => renderOccurrence(item, false)) : [make('p', 'empty-result', 'Nenhum problema corresponde ao filtro selecionado.')])); }
+
+  function openModal(item, opener) { lastFocusedElement = opener || document.activeElement; modalTitle.textContent = `${text(item.criterion)} · ${text(item.ruleId)}`; const details = renderOccurrence(item, false); details.open = true; modalContent.replaceChildren(details.querySelector('.criterion-body').cloneNode(true)); modal.hidden = false; modalPanel.focus(); }
+  function closeModal() { modal.hidden = true; modalContent.replaceChildren(); lastFocusedElement?.focus(); }
 
   function codeBlock(label, value, language = 'html') {
     const wrapper = make('div', 'code-block');
@@ -84,7 +116,9 @@
     title.textContent = `${text(item.criterion)} · ${text(item.ruleId)}`;
     badge.textContent = captureBlocked ? 'Sem resultado' : statusLabels[item.status] || text(item.status);
     badge.classList.add(captureBlocked ? 'status-neutral' : `status-${item.status || 'review'}`);
+    summary.addEventListener('click', (event) => { event.preventDefault(); openModal(item, summary); });
     const body = details.querySelector('.criterion-body');
+    const suggestion = currentSuggestions.find((entry) => entry.ruleId === item.ruleId);
     const heading = make('p', 'occurrence-description', captureBlocked ? 'A captura não permitiu aplicar este critério.' : text(item.description));
     body.append(heading);
     const grid = make('dl', 'detail-grid');
@@ -103,10 +137,12 @@
       comparison.append(make('h3', '', 'Comparação antes / depois'));
       const columns = make('div', 'comparison-grid');
       columns.append(codeBlock('Antes', item.html || '', 'html'));
-      columns.append(codeBlock('Depois', item.correctedHtml || item.remediation || '', 'html'));
+      const correctedCode = item.correctedHtml || suggestion?.html || suggestion?.css;
+      if (correctedCode) columns.append(codeBlock('Depois', correctedCode, suggestion?.css && !suggestion?.html ? 'css' : 'html'));
+      else columns.append(make('p', 'technical-guidance', item.remediation || 'Correção automática não disponível para esta ocorrência.'));
       comparison.append(columns);
-      if (item.correctedHtml || item.remediation || item.expectedResult) {
-        comparison.append(field('Correção sugerida', item.remediation), field('Resultado esperado', item.expectedResult));
+      if (item.correctedHtml || suggestion?.html || suggestion?.css || item.remediation || item.expectedResult) {
+        comparison.append(field('Correção sugerida', suggestion?.rationale || item.remediation), field('Resultado esperado', suggestion?.expectedResult || item.expectedResult));
         body.append(comparison);
       }
     }
@@ -126,11 +162,15 @@
     card.append(content); return card;
   }
 
-  function renderReport(report) {
+  function renderReport(report, suggestions = []) {
     const snapshot = report?.snapshot || {};
     const captureState = report?.captureState || snapshot.captureState || 'captured';
     const captureBlocked = captureState !== 'captured';
     const results = captureBlocked ? [] : (report?.results || []);
+    lastReport = report;
+    currentSuggestions = suggestions.length ? suggestions : (report.suggestions || report._suggestions || []);
+    currentResults = results.filter((item) => item.status === 'violation' || item.status === 'review');
+    activeFilter = 'all';
     const images = captureBlocked ? [] : (snapshot.images || []);
     const counts = results.reduce((acc, item) => { acc[item.status] = (acc[item.status] || 0) + 1; return acc; }, {});
     resultUrl.textContent = text(report?.target?.url);
@@ -143,11 +183,16 @@
     document.querySelector('#image-summary').textContent = captureBlocked ? 'As imagens não foram analisadas.' : `${images.length} imagem(ns) encontrada(s); ${images.filter((item) => item.humanReviewRequired).length} exige(m) revisão humana.`;
     document.querySelector('#criteria-count').textContent = `${results.length} ocorrência(s)`;
     document.querySelector('#images-count').textContent = `${images.length} imagem(ns)`;
-    ruleResults.replaceChildren(...(results.length ? results.map((item) => renderOccurrence(item, false)) : [make('p', 'empty-result', captureBlocked ? 'Sem resultados WCAG: a captura não foi concluída.' : 'Nenhuma ocorrência foi fornecida pelo relatório.')]));
+    drawCategories();
+    drawResults();
     imageResults.replaceChildren(...(images.length ? images.map(renderImage) : [make('p', 'empty-result', captureBlocked ? 'Sem imagens: a captura não foi concluída.' : 'Nenhuma imagem foi encontrada.') ]));
   }
 
   window.addEventListener('hashchange', route);
+  document.querySelectorAll('.filter-button').forEach((button) => button.addEventListener('click', () => { activeFilter = button.dataset.filter || 'all'; document.querySelectorAll('.filter-button').forEach((item) => item.classList.toggle('is-active', item === button)); drawResults(); }));
+  document.querySelector('#modal-close')?.addEventListener('click', closeModal);
+  document.querySelector('[data-close-modal]')?.addEventListener('click', closeModal);
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal && !modal.hidden) { closeModal(); return; } if (event.key === 'Tab' && modal && !modal.hidden) { const focusable = [...modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]; if (!focusable.length) return; const first = focusable[0]; const last = focusable[focusable.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); } } });
   form?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const url = String(new FormData(form).get('url') ?? '').trim();
@@ -158,7 +203,7 @@
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'Não foi possível analisar a URL.');
       const report = payload.report || { target: { url }, snapshot: payload.snapshot, results: [], generatedAt: new Date().toISOString(), captureState: payload.snapshot?.captureState || 'content-unavailable', captureMessage: payload.snapshot?.captureMessage };
-      renderReport(report); const state = historyState(); if (report.captureState === 'captured') state.validReports = [report, ...(state.validReports || [])]; else state.failedAudits = [{ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), target: { url }, message: report.captureMessage || 'A captura não foi concluída.' }, ...(state.failedAudits || [])]; saveHistory(state); status.textContent = 'Análise concluída. Os resultados estão disponíveis na aba Análises.'; window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden');
+      renderReport(report, payload.suggestions || []); report._suggestions = payload.suggestions || []; const state = historyState(); if (report.captureState === 'captured') state.validReports = [report, ...(state.validReports || [])]; else state.failedAudits = [{ id: crypto.randomUUID(), occurredAt: new Date().toISOString(), target: { url }, message: report.captureMessage || 'A captura não foi concluída.' }, ...(state.failedAudits || [])]; saveHistory(state); status.textContent = 'Análise concluída. Os resultados estão disponíveis na aba Análises.'; window.location.hash = 'analises'; document.querySelector('#analysis-empty')?.setAttribute('hidden', ''); document.querySelector('#analysis-results')?.removeAttribute('hidden');
     } catch (error) { status.textContent = error instanceof Error ? error.message : 'Falha na análise.'; }
   });
   route();

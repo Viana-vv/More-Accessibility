@@ -1,0 +1,13 @@
+.feature-grid { display: none; }
+.result-filters, .category-list, .report-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.filter-button, .category-button { border: 1px solid var(--line); border-radius: 999px; padding: .55rem .85rem; background: var(--surface); color: var(--text); cursor: pointer; }
+.filter-button.is-active, .filter-button:hover, .category-button:hover { background: var(--surface-2); border-color: var(--focus); }
+.category-button { text-align: left; border-radius: .7rem; }
+.detail-modal { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 1rem; }
+.detail-modal[hidden] { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / .72); }
+.modal-panel { position: relative; z-index: 1; width: min(900px, 100%); max-height: min(90vh, 900px); overflow: auto; padding: 1.5rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); }
+.modal-close { position: absolute; top: .8rem; right: .8rem; width: 2.5rem; height: 2.5rem; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--text); font-size: 1.4rem; cursor: pointer; }
+.criterion-group-title { margin: 1.2rem 0 .6rem; color: var(--muted); font-size: 1rem; }
+.history-list { display: grid; gap: .8rem; margin-top: 1.5rem; }
+@media (max-width: 760px) { .modal-panel { max-height: 94vh; padding: 1rem; } .result-filters, .category-list, .report-actions { align-items: stretch; flex-direction: column; } }

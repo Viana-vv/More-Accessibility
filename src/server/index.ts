@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import pathUtil from 'node:path';
 import type { RenderedPageSnapshot } from '../shared/contracts.js';
 import { auditSnapshot } from '../engine/index.js';
+import { generateCorrectionSuggestions } from '../comparisons/suggestions.js';
 import { captureRenderedPage, CaptureError, type CdpSnapshotOptions } from './cdp.js';
 import { UrlPolicyError, validateExternalUrl } from './url-policy.js';
 
@@ -44,7 +45,7 @@ export function createLocalServer(options: ServerOptions = {}): Server {
       if (snapshot.captureState !== 'captured' && snapshot.captureState !== undefined) return json(response, 200, { snapshot });
       const report = auditSnapshot(snapshot);
       report.target.url = safe.url.href;
-      return json(response, 200, { snapshot, report });
+      return json(response, 200, { snapshot, report, suggestions: generateCorrectionSuggestions(report) });
     } catch (error) {
       if (error instanceof SyntaxError) return json(response, 400, { error: 'JSON inválido.' });
       if (error instanceof UrlPolicyError) return json(response, 400, { error: error.message, code: error.code });

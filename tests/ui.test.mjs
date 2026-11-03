@@ -16,6 +16,9 @@ test('interface possui navegação semântica, formulário e logo acessível', (
   assert.doesNotMatch(html, /aria-label="Notificações"|aria-label="Perfil"/);
   assert.match(html, /id="rule-results"/);
   assert.match(html, /id="image-results"/);
+  assert.match(html, /id="result-filters"/);
+  assert.match(html, /id="detail-modal"/);
+  assert.doesNotMatch(html, /class="feature-grid"/);
 });
 
 test('interface inclui foco visível e layout responsivo', () => {
@@ -32,4 +35,7 @@ test('interface prevê detalhe por ocorrência, comparação e cópia', async ()
   assert.match(app, /navigator\.clipboard\.writeText/);
   assert.match(app, /captureBlocked/);
   assert.match(resultsCss, /\.comparison-grid/);
+  assert.match(app, /localStorage/);
+  assert.match(app, /Escape/);
+  assert.match(app, /currentResults = results\.filter/);
 });
